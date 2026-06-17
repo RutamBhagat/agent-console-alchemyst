@@ -26,6 +26,14 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
       }
       return;
     }
+    case "toolAck": {
+      const ack = { type: "TOOL_ACK", call_id: message.call_id } satisfies ClientMessage;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(ack));
+        self.postMessage({ type: "clientEvent", direction: "out", message: ack });
+      }
+      return;
+    }
   }
 });
 

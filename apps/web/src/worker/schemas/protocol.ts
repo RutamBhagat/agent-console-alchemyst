@@ -58,4 +58,8 @@ export const WorkerMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("sendUserMessage"),
     content: z.string(),
   }),
+  z.object({
+    type: z.literal("toolAck"),
+    call_id: z.string(),
+  }),
 ]);
