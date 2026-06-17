@@ -21,6 +21,7 @@ const sequenceGate = new SequenceGate();
 let lastUserMessage: string | null = null;
 let lastStreamProgressSeq = 0;
 let resumePendingAtStreamSeq: number | null = null;
+const answeredPingSeqs = new Set<number>();
 
 const reconnectController = createReconnectController({
   url: WS_URL,
@@ -39,6 +40,7 @@ function send(content: string) {
   lastUserMessage = content;
   lastStreamProgressSeq = 0;
   resumePendingAtStreamSeq = null;
+  answeredPingSeqs.clear();
   reconnectController.send({ type: "USER_MESSAGE", content });
 }
 
@@ -76,6 +78,7 @@ function restartLastUserMessage() {
 
   lastStreamProgressSeq = 0;
   resumePendingAtStreamSeq = null;
+  answeredPingSeqs.clear();
   sequenceGate.noteUserMessageSent();
   streamStallWatchdog.noteStreamStarted();
   globalThis.postMessage({ type: "flush-last-turn" } satisfies WorkerOut);
@@ -141,7 +144,10 @@ function tracePingImmediately(message: JsonEvent) {
 
 function respondToPingImmediately(message: JsonEvent) {
   if (message.type !== "PING") return;
+  if (typeof message.seq !== "number") return;
+  if (answeredPingSeqs.has(message.seq)) return;
 
+  answeredPingSeqs.add(message.seq);
   const echo = typeof message.challenge === "string" ? message.challenge : "";
   sendToServer({ type: "PONG", echo });
 }
