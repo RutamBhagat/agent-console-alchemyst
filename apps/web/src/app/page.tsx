@@ -3,14 +3,17 @@
 import { useEffect, useRef } from "react";
 
 import { useChatStore } from "./chat-store";
+import { useContextStore } from "./context-store";
 import { useTraceStore } from "./trace-store";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
 
 export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const addTrace = useTraceStore((state) => state.addTrace);
-  const applyTraceEvent = useChatStore((state) => state.applyTraceEvent);
+  const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
+  const applyContextTraceEvent = useContextStore((state) => state.applyTraceEvent);
 
   useEffect(() => {
     const worker = new Worker(new URL("./agent-worker.ts", import.meta.url), {
@@ -20,7 +23,8 @@ export default function Home() {
     function handleWorkerMessage(event: MessageEvent<unknown>) {
       if (!isTraceMessage(event.data)) return;
       addTrace(event.data.direction, event.data.event);
-      applyTraceEvent(event.data.direction, event.data.event);
+      applyChatTraceEvent(event.data.direction, event.data.event);
+      applyContextTraceEvent(event.data.direction, event.data.event);
     }
 
     worker.addEventListener("message", handleWorkerMessage);
@@ -31,7 +35,7 @@ export default function Home() {
       worker.terminate();
       workerRef.current = null;
     };
-  }, [addTrace, applyTraceEvent]);
+  }, [addTrace, applyChatTraceEvent, applyContextTraceEvent]);
 
   function sendMessage(content: string) {
     workerRef.current?.postMessage({ type: "send", content });
@@ -41,7 +45,7 @@ export default function Home() {
     <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
       <TraceSidebar />
       <ChatPanel onSubmitMessage={sendMessage} />
-      <section className="min-w-0 rounded-lg border p-4"></section>
+      <ContextPanel />
     </main>
   );
 }

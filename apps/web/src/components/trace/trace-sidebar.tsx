@@ -67,7 +67,7 @@ export function TraceSidebar() {
                     <div className="overflow-x-auto">
                       <JsonView
                         value={trace.event}
-                        collapsed={false}
+                        collapsed={1}
                         displayDataTypes={false}
                         enableClipboard={false}
                         style={{ fontSize: 12 }}
