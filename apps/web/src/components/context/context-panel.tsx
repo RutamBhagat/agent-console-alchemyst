@@ -35,11 +35,6 @@ export function ContextPanel() {
     <section className="flex min-h-0 min-w-0 flex-col rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium">Context</h2>
-        {snapshots.length > 0 ? (
-          <span className="font-mono text-xs text-muted-foreground">
-            {safeIndex + 1}/{snapshots.length}
-          </span>
-        ) : null}
       </div>
 
       {contextIds.length > 0 ? (

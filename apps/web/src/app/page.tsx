@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useChatStore } from "../store/chat-store";
 import { useContextStore } from "../store/context-store";
 import { useTraceStore } from "../store/trace-store";
+import {
+  type ConnectionStatus,
+  ConnectionStatusPill,
+  isConnectionStatusMessage,
+} from "@/components/connection-status-pill";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
@@ -18,6 +23,8 @@ function isFlushMessage(value: unknown): value is WorkerFlushMessage {
 
 export default function Home() {
   const workerRef = useRef<Worker | null>(null);
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connected");
   const addTrace = useTraceStore((state) => state.addTrace);
   const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
   const flushLastTurn = useChatStore((state) => state.flushLastTurn);
@@ -34,6 +41,11 @@ export default function Home() {
     );
 
     function handleWorkerMessage(event: MessageEvent<unknown>) {
+      if (isConnectionStatusMessage(event.data)) {
+        setConnectionStatus(event.data.status);
+        return;
+      }
+
       if (isFlushMessage(event.data)) {
         flushLastTurn();
         return;
@@ -46,7 +58,10 @@ export default function Home() {
       applyChatTraceEvent(direction, traceEvent);
       applyContextTraceEvent(direction, traceEvent);
 
-      if (direction === "server->worker" && typeof traceEvent.seq === "number") {
+      if (
+        direction === "server->worker" &&
+        typeof traceEvent.seq === "number"
+      ) {
         worker.postMessage({ type: "processed", seq: traceEvent.seq });
       }
     }
@@ -59,17 +74,20 @@ export default function Home() {
       worker.terminate();
       workerRef.current = null;
     };
-  }, [addTrace, applyChatTraceEvent, applyContextTraceEvent]);
+  }, [addTrace, applyChatTraceEvent, applyContextTraceEvent, flushLastTurn]);
 
   function sendMessage(content: string) {
     workerRef.current?.postMessage({ type: "send", content });
   }
 
   return (
-    <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
-      <TraceSidebar />
-      <ChatPanel onSubmitMessage={sendMessage} />
-      <ContextPanel />
-    </main>
+    <>
+      <ConnectionStatusPill status={connectionStatus} />
+      <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
+        <TraceSidebar />
+        <ChatPanel onSubmitMessage={sendMessage} />
+        <ContextPanel />
+      </main>
+    </>
   );
 }
