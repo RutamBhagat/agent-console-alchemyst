@@ -22,6 +22,8 @@ let lastUserMessage: string | null = null;
 let lastStreamProgressSeq = 0;
 let resumePendingAtStreamSeq: number | null = null;
 const answeredPingSeqs = new Set<number>();
+const acknowledgedToolCallIds = new Set<string>();
+let suppressToolAcks = false;
 
 const reconnectController = createReconnectController({
   url: WS_URL,
@@ -41,6 +43,8 @@ function send(content: string) {
   lastStreamProgressSeq = 0;
   resumePendingAtStreamSeq = null;
   answeredPingSeqs.clear();
+  acknowledgedToolCallIds.clear();
+  suppressToolAcks = false;
   reconnectController.send({ type: "USER_MESSAGE", content });
 }
 
@@ -51,6 +55,7 @@ function sendToServer(message: JsonEvent) {
 function resumeFromLastProcessedSeq() {
   const lastSeq = sequenceGate.getResumeSeq();
   resumePendingAtStreamSeq = lastStreamProgressSeq;
+  suppressToolAcks = true;
   sendToServer({ type: "RESUME", last_seq: lastSeq });
   emitConnectionStatus("connected");
 }
@@ -79,6 +84,8 @@ function restartLastUserMessage() {
   lastStreamProgressSeq = 0;
   resumePendingAtStreamSeq = null;
   answeredPingSeqs.clear();
+  acknowledgedToolCallIds.clear();
+  suppressToolAcks = false;
   sequenceGate.noteUserMessageSent();
   streamStallWatchdog.noteStreamStarted();
   globalThis.postMessage({ type: "flush-last-turn" } satisfies WorkerOut);
@@ -101,6 +108,7 @@ function handleServerMessage(raw: string) {
 
   tracePingImmediately(message);
   respondToPingImmediately(message);
+  respondToToolCallImmediately(message);
 
   const next = sequenceGate.accept(message);
   if (next) emitTrace("server->worker", next);
@@ -116,7 +124,6 @@ function markServerMessageProcessed(seq: number) {
   }
 
   streamStallWatchdog.noteOrderedProgress(processed);
-  respondAfterUiConsumption(processed);
   if (next) emitTrace("server->worker", next);
 }
 
@@ -131,11 +138,14 @@ function isStreamLifecycleEvent(message: JsonEvent) {
   );
 }
 
+function respondToToolCallImmediately(message: JsonEvent) {
+  if (message.type !== "TOOL_CALL") return;
+  if (typeof message.call_id !== "string") return;
+  if (suppressToolAcks) return;
+  if (acknowledgedToolCallIds.has(message.call_id)) return;
 
-function respondAfterUiConsumption(message: JsonEvent) {
-  if (message.type === "TOOL_CALL" && typeof message.call_id === "string") {
-    sendToServer({ type: "TOOL_ACK", call_id: message.call_id });
-  }
+  acknowledgedToolCallIds.add(message.call_id);
+  sendToServer({ type: "TOOL_ACK", call_id: message.call_id });
 }
 
 function tracePingImmediately(message: JsonEvent) {
