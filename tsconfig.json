@@ -1,0 +1,3 @@
+{
+  "extends": "@agent-console-alchemyst/config/tsconfig.base.json"
+}
