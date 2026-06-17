@@ -153,15 +153,23 @@ export default function Home() {
       }
     >
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
-      {connectionStatus !== "connected" && (
-        <div className="fixed right-3 top-3 z-50 rounded-md border bg-background/90 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
-          {connectionStatus === "connecting"
+      <div
+        className={`fixed right-3 top-3 z-50 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur ${
+          connectionStatus === "connected"
+            ? "border-green-600/40 bg-green-50/90 text-green-700"
+            : connectionStatus === "connecting"
+              ? "border-red-600/40 bg-red-50/90 text-red-700"
+              : "border-amber-600/40 bg-amber-50/90 text-amber-700"
+        }`}
+      >
+        {connectionStatus === "connected"
+          ? "Connected"
+          : connectionStatus === "connecting"
             ? "Connecting..."
             : reconnectDelayMs
               ? `Reconnecting in ${Math.ceil(reconnectDelayMs / 1000)}s...`
               : "Reconnecting..."}
-        </div>
-      )}
+      </div>
       <Sidebar side="left" collapsible="offcanvas">
         <TraceSidebar events={traceEvents} />
       </Sidebar>
