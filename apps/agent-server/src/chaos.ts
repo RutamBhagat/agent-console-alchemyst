@@ -1,5 +1,21 @@
 import { ChaosConfig, ServerMessage } from "./types/index.js";
 
+type IntRange = [number, number];
+
+const CHAOS_SETTINGS = {
+  dropConnection: { enabled: true, afterMessages: [15, 45] },
+  reorder: { enabled: true, chancePercent: [15, 35] },
+  duplicate: { enabled: true, chancePercent: [5, 15] },
+  latencySpike: { enabled: true, chancePercent: [5, 13], ms: [2000, 8000] },
+  corruptPing: { enabled: true, chancePercent: [15, 25] },
+} satisfies {
+  dropConnection: { enabled: boolean; afterMessages: IntRange };
+  reorder: { enabled: boolean; chancePercent: IntRange };
+  duplicate: { enabled: boolean; chancePercent: IntRange };
+  latencySpike: { enabled: boolean; chancePercent: IntRange; ms: IntRange };
+  corruptPing: { enabled: boolean; chancePercent: IntRange };
+};
+
 // ─────────────────────────────────────────────────────────────
 // ChaosEngine
 //
@@ -40,7 +56,7 @@ export class ChaosEngine {
    * Check if a PING should have its challenge corrupted.
    */
   shouldCorruptPing(): boolean {
-    return Math.random() < this.config.corruptPingProbability;
+    return this.hitsChance(this.config.corruptPingChancePercent);
   }
 
   /**
@@ -60,13 +76,13 @@ export class ChaosEngine {
     let delayMs = 0;
 
     // ── Latency spike ─────────────────────────────────────
-    if (Math.random() < this.config.latencySpikeProbability) {
+    if (this.hitsChance(this.config.latencySpikeChancePercent)) {
       const [min, max] = this.config.latencySpikeMs;
       delayMs = min + Math.random() * (max - min);
     }
 
     // ── Reorder: buffer messages and shuffle ──────────────
-    if (Math.random() < this.config.reorderProbability) {
+    if (this.hitsChance(this.config.reorderChancePercent)) {
       this.reorderBuffer.push(message);
       if (this.reorderBuffer.length >= this.REORDER_BUFFER_SIZE) {
         // Fisher-Yates shuffle
@@ -99,7 +115,7 @@ export class ChaosEngine {
     const finalOutput: ServerMessage[] = [];
     for (const msg of output) {
       finalOutput.push(msg);
-      if (Math.random() < this.config.duplicateProbability) {
+      if (this.hitsChance(this.config.duplicateChancePercent)) {
         finalOutput.push(msg); // exact duplicate, same seq
       }
     }
@@ -121,22 +137,40 @@ export class ChaosEngine {
     this.reorderBuffer = [];
     return buf;
   }
+
+  private hitsChance(percent: number): boolean {
+    return Math.random() * 100 < percent;
+  }
 }
 
 /**
- * Generate a chaos config with random parameters.
- * Each connection gets a different chaos profile so candidates
- * can't hard-code around a specific pattern.
+ * Generate a chaos config from the settings above.
+ * Set enabled=false to isolate one behavior while testing.
  */
 export function generateChaosConfig(): ChaosConfig {
   return {
-    // Drop after 15-45 messages (roughly mid-stream for most scripts)
-    dropAfterMessages:
-      Math.random() < 0.5 ? 15 + Math.floor(Math.random() * 30) : null,
-    reorderProbability: 0.15 + Math.random() * 0.2, // 15-35%
-    duplicateProbability: 0.05 + Math.random() * 0.1, // 5-15%
-    latencySpikeProbability: 0.05 + Math.random() * 0.08, // 5-13%
-    latencySpikeMs: [2000, 6000 + Math.random() * 2000],
-    corruptPingProbability: 0.15 + Math.random() * 0.1, // 15-25%
+    dropAfterMessages: CHAOS_SETTINGS.dropConnection.enabled
+      ? randomIntRange(CHAOS_SETTINGS.dropConnection.afterMessages)
+      : null,
+    reorderChancePercent: CHAOS_SETTINGS.reorder.enabled
+      ? randomIntRange(CHAOS_SETTINGS.reorder.chancePercent)
+      : 0,
+    duplicateChancePercent: CHAOS_SETTINGS.duplicate.enabled
+      ? randomIntRange(CHAOS_SETTINGS.duplicate.chancePercent)
+      : 0,
+    latencySpikeChancePercent: CHAOS_SETTINGS.latencySpike.enabled
+      ? randomIntRange(CHAOS_SETTINGS.latencySpike.chancePercent)
+      : 0,
+    latencySpikeMs: [
+      CHAOS_SETTINGS.latencySpike.ms[0],
+      CHAOS_SETTINGS.latencySpike.ms[1],
+    ],
+    corruptPingChancePercent: CHAOS_SETTINGS.corruptPing.enabled
+      ? randomIntRange(CHAOS_SETTINGS.corruptPing.chancePercent)
+      : 0,
   };
+}
+
+function randomIntRange([min, max]: IntRange): number {
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
