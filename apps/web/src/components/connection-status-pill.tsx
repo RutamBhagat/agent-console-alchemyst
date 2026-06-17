@@ -19,11 +19,7 @@ export function isConnectionStatusMessage(
   );
 }
 
-export function ConnectionStatusPill({
-  status,
-}: {
-  status: ConnectionStatus;
-}) {
+export function ConnectionStatusPill({ status }: { status: ConnectionStatus }) {
   const label =
     status === "connected"
       ? "Server connected"
@@ -38,7 +34,7 @@ export function ConnectionStatusPill({
         : "animate-pulse bg-sky-500";
 
   return (
-    <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs shadow-sm backdrop-blur">
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs shadow-sm backdrop-blur">
       <span className={`h-2 w-2 rounded-full ${dotClass}`} aria-hidden="true" />
       {label}
     </div>

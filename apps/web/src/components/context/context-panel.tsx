@@ -1,16 +1,26 @@
 import JsonView from "@uiw/react-json-view";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { VirtualDiffViewer } from "virtual-react-json-diff";
 
 import { useContextStore } from "@/store/context-store";
 import type { JsonValue } from "@/store/trace-store";
+import { Button } from "@agent-console-alchemyst/ui/components/button";
 import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
 } from "@agent-console-alchemyst/ui/components/sidebar";
 
-export function ContextPanel() {
+type ContextPanelProps = {
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
+};
+
+export function ContextPanel({
+  isFullscreen,
+  onToggleFullscreen,
+}: ContextPanelProps) {
   const contexts = useContextStore((state) => state.contexts);
   const activeContextId = useContextStore((state) => state.activeContextId);
   const setActiveContextId = useContextStore(
@@ -40,7 +50,20 @@ export function ContextPanel() {
     <>
       <SidebarHeader className="gap-3 pt-14">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">Context</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-medium">Context</h2>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggleFullscreen}
+            >
+              {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+              <span className="sr-only">
+                {isFullscreen ? "Exit context fullscreen" : "Expand context"}
+              </span>
+            </Button>
+          </div>
           <span className="font-mono text-xs text-muted-foreground">
             {snapshots.length}
           </span>
@@ -68,7 +91,9 @@ export function ContextPanel() {
 
       {snapshots.length === 0 || !current ? (
         <SidebarContent className="px-4">
-          <p className="text-sm text-muted-foreground">No context snapshots yet.</p>
+          <p className="text-sm text-muted-foreground">
+            No context snapshots yet.
+          </p>
         </SidebarContent>
       ) : (
         <SidebarContent className="px-2 pb-2">

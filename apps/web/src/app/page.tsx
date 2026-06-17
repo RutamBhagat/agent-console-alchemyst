@@ -54,6 +54,7 @@ export default function Home() {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connected");
   const [sidebarsOpen, setSidebarsOpen] = useState(true);
+  const [contextFullscreen, setContextFullscreen] = useState(false);
   const [pendingProcessedSeqs, setPendingProcessedSeqs] = useState<number[]>(
     [],
   );
@@ -132,7 +133,11 @@ export default function Home() {
     <SidebarProvider
       open={sidebarsOpen}
       onOpenChange={setSidebarsOpen}
-      style={{ "--sidebar-width": "30rem" } as CSSProperties}
+      style={
+        {
+          "--sidebar-width": contextFullscreen ? "100rem" : "30rem",
+        } as CSSProperties
+      }
     >
       <ConnectionStatusPill status={connectionStatus} />
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
@@ -143,7 +148,10 @@ export default function Home() {
         <ChatPanel onSubmitMessage={sendMessage} />
       </SidebarInset>
       <Sidebar side="right" collapsible="offcanvas">
-        <ContextPanel />
+        <ContextPanel
+          isFullscreen={contextFullscreen}
+          onToggleFullscreen={() => setContextFullscreen((value) => !value)}
+        />
       </Sidebar>
     </SidebarProvider>
   );
