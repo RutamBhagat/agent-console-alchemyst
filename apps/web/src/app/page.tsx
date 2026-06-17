@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { env } from "@agent-console-alchemyst/env/web";
 import { Button } from "@agent-console-alchemyst/ui/components/button";
@@ -11,12 +12,21 @@ import {
   SidebarTrigger,
 } from "@agent-console-alchemyst/ui/components/sidebar";
 import { UserMessage } from "@/components/chat/user-message";
+import { ContextSidebar } from "@/components/context/context-sidebar";
 import { ToolTurn } from "@/components/tools/tool-turn";
 import { useChatStore } from "@/stores/chat-store";
-import { useScrollStore } from "@/stores/scroll-store";
-import type { ServerMessage } from "@/worker/types/serverToClient";
+import { useContextStore } from "@/stores/context-store";
+import { useUtilStore } from "@/stores/util-store";
+import type {
+  ContextSnapshotMessage,
+  ServerMessage,
+} from "@/worker/types/serverToClient";
 
-type WorkerPatch = { type: "statePatch"; chat?: ServerMessage };
+type WorkerPatch = {
+  type: "statePatch";
+  chat?: ServerMessage;
+  context?: ContextSnapshotMessage;
+};
 
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
@@ -30,13 +40,16 @@ export default function Home() {
     endStream,
     chats,
   } = useChatStore();
-  const { mode, toggleMode } = useScrollStore();
+  const addContextSnapshot = useContextStore((state) => state.addContextSnapshot);
+  const { fullscreen, mode, toggleMode } = useUtilStore();
 
   useEffect(() => {
     const worker = new Worker(
       new URL("../worker/agent-worker.ts", import.meta.url),
     );
     worker.addEventListener("message", (event: MessageEvent<WorkerPatch>) => {
+      if (event.data.context) addContextSnapshot(event.data.context);
+
       const chat = event.data.chat;
       if (!chat) return;
 
@@ -56,7 +69,7 @@ export default function Home() {
       worker.terminate();
       workerRef.current = undefined;
     };
-  }, []);
+  }, [addContextSnapshot, addToken, addToolCall, addToolResult, endStream]);
 
   useEffect(() => {
     if (mode !== "auto") return;
@@ -78,7 +91,7 @@ export default function Home() {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": fullscreen ? "100rem" : "40rem" } as CSSProperties}>
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
       <Sidebar side="left" collapsible="offcanvas"></Sidebar>
       <SidebarInset className="relative h-svh min-h-0 p-4">
@@ -125,7 +138,9 @@ export default function Home() {
           </Button>
         </form>
       </SidebarInset>
-      <Sidebar side="right" collapsible="offcanvas"></Sidebar>
+      <Sidebar side="right" collapsible="offcanvas">
+        <ContextSidebar />
+      </Sidebar>
     </SidebarProvider>
   );
 }
