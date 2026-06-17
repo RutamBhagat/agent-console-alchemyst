@@ -80,14 +80,14 @@ curl -s http://localhost:4747/log | python3 -m json.tool
 ## Submission Media
 Normal-mode screenshots:
 ### Streamed response with tool call
-<img width="815" height="1239" alt="Screenshot_20260617_225326" src="https://github.com/user-attachments/assets/d4ceaf67-1d6d-4c45-b7a2-78d3c8fcfcd0" />
+<img width="2560" height="1440" alt="Screenshot_20260618_000918" src="https://github.com/user-attachments/assets/9aa1a323-5ed8-494a-9705-d876804792a6" />
 
 ### Trace timeline
-<img width="846" height="1167" alt="Screenshot_20260617_225406" src="https://github.com/user-attachments/assets/ba98beb0-d61f-47d8-bad5-a0cb7af06f2c" />
+<img width="764" height="1440" alt="Screenshot_20260618_001009" src="https://github.com/user-attachments/assets/bf941b46-1e16-4f07-bb0d-06fefece62b5" />
 
 ### Context inspector diff
-<img width="808" height="1319" alt="Screenshot_20260617_225457" src="https://github.com/user-attachments/assets/3b42cb89-3ff9-4782-99a6-bf735f2e4fc1" />
-<img width="793" height="1302" alt="Screenshot_20260617_225509" src="https://github.com/user-attachments/assets/b17c8ed7-cd7d-4041-97c0-e4c34595f360" />
+<img width="1796" height="1440" alt="Screenshot_20260618_001044" src="https://github.com/user-attachments/assets/44a3d88e-c934-433a-9739-d12d0c657448" />
+<img width="1797" height="1440" alt="Screenshot_20260618_001025" src="https://github.com/user-attachments/assets/20570f53-1b72-4295-8e87-1597983d2b06" />
 
 Chaos-mode recording:
 Demo YouTube: https://youtu.be/dA4lSnbTh2s
