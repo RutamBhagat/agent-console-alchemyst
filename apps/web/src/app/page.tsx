@@ -25,6 +25,7 @@ export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connected");
+  const [pendingProcessedSeqs, setPendingProcessedSeqs] = useState<number[]>([]);
   const addTrace = useTraceStore((state) => state.addTrace);
   const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
   const flushLastTurn = useChatStore((state) => state.flushLastTurn);
@@ -58,11 +59,11 @@ export default function Home() {
       applyChatTraceEvent(direction, traceEvent);
       applyContextTraceEvent(direction, traceEvent);
 
-      if (
-        direction === "server->worker" &&
-        typeof traceEvent.seq === "number"
-      ) {
-        worker.postMessage({ type: "processed", seq: traceEvent.seq });
+      const seq = traceEvent.seq;
+      if (direction === "server->worker" && typeof seq === "number") {
+        setPendingProcessedSeqs((seqs) =>
+          seqs.includes(seq) ? seqs : [...seqs, seq],
+        );
       }
     }
 
@@ -75,6 +76,18 @@ export default function Home() {
       workerRef.current = null;
     };
   }, [addTrace, applyChatTraceEvent, applyContextTraceEvent, flushLastTurn]);
+
+  useEffect(() => {
+    if (pendingProcessedSeqs.length === 0) return;
+
+    const worker = workerRef.current;
+    if (!worker) return;
+
+    for (const seq of pendingProcessedSeqs) {
+      worker.postMessage({ type: "processed", seq });
+    }
+    setPendingProcessedSeqs([]);
+  }, [pendingProcessedSeqs]);
 
   function sendMessage(content: string) {
     workerRef.current?.postMessage({ type: "send", content });

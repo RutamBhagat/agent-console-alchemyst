@@ -26,13 +26,20 @@ export function ConnectionStatusPill({
 }) {
   const label =
     status === "connected"
-      ? "Connected"
+      ? "Server connected"
       : status === "reconnecting"
-        ? "Reconnecting…"
-        : "Regenerating…";
+        ? "Server disconnected · reconnecting"
+        : "Reconnected · resuming from last event";
+  const dotClass =
+    status === "connected"
+      ? "bg-emerald-500"
+      : status === "reconnecting"
+        ? "animate-pulse bg-amber-500"
+        : "animate-pulse bg-sky-500";
 
   return (
-    <div className="fixed right-6 top-6 z-50 rounded-full border bg-background/95 px-3 py-1 text-xs shadow-sm backdrop-blur">
+    <div className="fixed right-6 top-6 z-50 flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs shadow-sm backdrop-blur">
+      <span className={`h-2 w-2 rounded-full ${dotClass}`} aria-hidden="true" />
       {label}
     </div>
   );
