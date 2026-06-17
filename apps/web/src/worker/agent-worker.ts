@@ -35,6 +35,16 @@ function handleSocketMessage(event: MessageEvent) {
     self.postMessage({ type: "clientEvent", direction: "in", message });
 
     switch (message.type) {
+      case "TOKEN":
+      case "TOOL_RESULT":
+      case "STREAM_END": {
+        self.postMessage({ type: "statePatch", chat: message });
+        return;
+      }
+      case "TOOL_CALL": {
+        self.postMessage({ type: "statePatch", chat: message });
+        return;
+      }
       case "CONTEXT_SNAPSHOT": {
         self.postMessage({ type: "statePatch", context: message });
         return;
