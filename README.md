@@ -7,6 +7,20 @@ The protocol handling is intentionally kept in a Web Worker: incoming frames are
 > [!NOTE]
 > `apps/agent-server` is the provided backend. It is read for protocol behavior, but not edited.
 
+## Youtube Demo
+
+https://youtu.be/dA4lSnbTh2s
+
+## Screenshots
+
+Add the normal-mode screenshots required by the assignment before submission:
+
+| View | File |
+| --- | --- |
+| Streamed response with a tool call | <img width="1476" height="1440" alt="Screenshot_20260619_003248" src="https://github.com/user-attachments/assets/704e4363-0421-4b7b-9fef-a79a8f8fcaa9" /> |
+| Trace timeline | <img width="537" height="1440" alt="Screenshot_20260619_003312" src="https://github.com/user-attachments/assets/5925d30c-5869-4657-8194-a4fddcdd29b4" /> |
+| Context inspector diff | <img width="1797" height="1440" alt="Screenshot_20260619_003332" src="https://github.com/user-attachments/assets/a2209d1c-bbf5-46e3-8ef0-ca4835ffa21f" /> |
+
 ## Features
 
 - Incremental token rendering over WebSockets.
@@ -124,16 +138,6 @@ Reset backend state:
 ```bash
 curl -s http://localhost:4747/reset
 ```
-
-## Screenshots
-
-Add the normal-mode screenshots required by the assignment before submission:
-
-| View | File |
-| --- | --- |
-| Streamed response with a tool call | `docs/screenshots/chat-tool-call.png` |
-| Trace timeline | `docs/screenshots/trace-timeline.png` |
-| Context inspector diff | `docs/screenshots/context-diff.png` |
 
 ## Project Layout
 
