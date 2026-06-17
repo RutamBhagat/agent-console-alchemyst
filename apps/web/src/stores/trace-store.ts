@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { ClientMessage } from "@/worker/types/clientToServer";
-import type { ServerMessage } from "@/worker/types/serverToClient";
+import type { ClientMessage } from "../../../agent-server/src/types";
+import type { ServerMessage } from "../../../agent-server/src/types";
 
 type TokenBatchMessage = {
   type: "TOKEN";

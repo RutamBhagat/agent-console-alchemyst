@@ -1,3 +1,5 @@
+import { ChaosConfig, ServerMessage } from "./types.js";
+
 // ─────────────────────────────────────────────────────────────
 // ChaosEngine
 //
@@ -8,8 +10,6 @@
 // - Connection drops (signalled, not executed here)
 // - Corrupt heartbeats
 // ─────────────────────────────────────────────────────────────
-
-import { ChaosConfig, ServerMessage } from "./types/index.js";
 
 export class ChaosEngine {
   private config: ChaosConfig;
@@ -50,10 +50,7 @@ export class ChaosEngine {
    *
    * Also returns a delay in ms to wait before sending.
    */
-  process(message: ServerMessage): {
-    messages: ServerMessage[];
-    delayMs: number;
-  } {
+  process(message: ServerMessage): { messages: ServerMessage[]; delayMs: number } {
     this.messagesSent++;
 
     const output: ServerMessage[] = [];
@@ -130,19 +127,14 @@ export class ChaosEngine {
  */
 export function generateChaosConfig(): ChaosConfig {
   return {
-    // On about half of chaos connections, drop after 15-44 sent messages.
-    dropAfterMessages:
-      Math.random() < 0.5 ? 15 + Math.floor(Math.random() * 30) : null,
-    // dropAfterMessages: null,
-    // reorderProbability: 0.15 + Math.random() * 0.2, // 15-35%
-    reorderProbability: 0,
-    // duplicateProbability: 0.05 + Math.random() * 0.1, // 5-15%
-    duplicateProbability: 0,
-    // latencySpikeProbability: 0.05 + Math.random() * 0.08, // 5-13%
-    latencySpikeProbability: 0,
-    // latencySpikeMs: [2000, 6000 + Math.random() * 2000],
-    latencySpikeMs: [2000, 8000],
-    // corruptPingProbability: 0.15 + Math.random() * 0.1, // 15-25%
-    corruptPingProbability: 0,
+    // Drop after 15-45 messages (roughly mid-stream for most scripts)
+    dropAfterMessages: Math.random() < 0.5
+      ? 15 + Math.floor(Math.random() * 30)
+      : null,
+    reorderProbability: 0.15 + Math.random() * 0.2,    // 15-35%
+    duplicateProbability: 0.05 + Math.random() * 0.1,   // 5-15%
+    latencySpikeProbability: 0.05 + Math.random() * 0.08, // 5-13%
+    latencySpikeMs: [2000, 6000 + Math.random() * 2000],
+    corruptPingProbability: 0.15 + Math.random() * 0.1, // 15-25%
   };
 }

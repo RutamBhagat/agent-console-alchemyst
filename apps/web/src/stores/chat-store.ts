@@ -4,8 +4,8 @@ import type {
   TokenMessage,
   ToolCallMessage,
   ToolResultMessage,
-} from "@/worker/types/serverToClient";
-import type { UserMessagePayload } from "@/worker/types/clientToServer";
+} from "../../../agent-server/src/types";
+import type { UserMessagePayload } from "../../../agent-server/src/types";
 
 export interface ChatStream {
   stream_id: string;

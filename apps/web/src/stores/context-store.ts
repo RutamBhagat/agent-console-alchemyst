@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ContextSnapshotMessage } from "@/worker/types/serverToClient";
+import type { ContextSnapshotMessage } from "../../../agent-server/src/types";
 
 interface ContextState {
   contexts: Record<string, ContextSnapshotMessage[]>;

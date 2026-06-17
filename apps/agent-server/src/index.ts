@@ -1,5 +1,5 @@
 import { AgentServer } from "./server.js";
-import { ServerMode } from "./types/index.js";
+import type { ServerMode } from "./types.js";
 
 // ─────────────────────────────────────────────────────────────
 // CLI entry point
