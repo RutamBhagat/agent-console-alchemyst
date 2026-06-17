@@ -27,9 +27,15 @@ export default function Home() {
 
     function handleWorkerMessage(event: MessageEvent<unknown>) {
       if (!isTraceMessage(event.data)) return;
-      addTrace(event.data.direction, event.data.event);
-      applyChatTraceEvent(event.data.direction, event.data.event);
-      applyContextTraceEvent(event.data.direction, event.data.event);
+
+      const { direction, event: traceEvent } = event.data;
+      addTrace(direction, traceEvent);
+      applyChatTraceEvent(direction, traceEvent);
+      applyContextTraceEvent(direction, traceEvent);
+
+      if (direction === "server->worker" && typeof traceEvent.seq === "number") {
+        worker.postMessage({ type: "processed", seq: traceEvent.seq });
+      }
     }
 
     worker.addEventListener("message", handleWorkerMessage);
