@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { useChatStore } from "../store/chat-store";
 import { useContextStore } from "../store/context-store";
-import { useTraceStore } from "../store/trace-store";
+import {
+  isJsonEvent,
+  type JsonEvent,
+  type TraceDirection,
+  useTraceStore,
+} from "../store/trace-store";
 import {
   type ConnectionStatus,
   ConnectionStatusPill,
@@ -15,10 +20,27 @@ import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
 
 type WorkerFlushMessage = { type: "flush-last-turn" };
+type WorkerProtocolMessage = {
+  type: "protocol";
+  direction: TraceDirection;
+  event: JsonEvent;
+};
 
 function isFlushMessage(value: unknown): value is WorkerFlushMessage {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   return (value as Partial<WorkerFlushMessage>).type === "flush-last-turn";
+}
+
+function isProtocolMessage(value: unknown): value is WorkerProtocolMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const candidate = value as Partial<WorkerProtocolMessage>;
+  return (
+    candidate.type === "protocol" &&
+    (candidate.direction === "worker->server" ||
+      candidate.direction === "server->worker") &&
+    isJsonEvent(candidate.event)
+  );
 }
 
 export default function Home() {
@@ -52,14 +74,18 @@ export default function Home() {
         return;
       }
 
-      if (!isTraceMessage(event.data)) return;
+      if (isTraceMessage(event.data)) {
+        addTrace(event.data.direction, event.data.event);
+        return;
+      }
 
-      const { direction, event: traceEvent } = event.data;
-      addTrace(direction, traceEvent);
-      applyChatTraceEvent(direction, traceEvent);
-      applyContextTraceEvent(direction, traceEvent);
+      if (!isProtocolMessage(event.data)) return;
 
-      const seq = traceEvent.seq;
+      const { direction, event: protocolEvent } = event.data;
+      applyChatTraceEvent(direction, protocolEvent);
+      applyContextTraceEvent(direction, protocolEvent);
+
+      const seq = protocolEvent.seq;
       if (direction === "server->worker" && typeof seq === "number") {
         setPendingProcessedSeqs((seqs) =>
           seqs.includes(seq) ? seqs : [...seqs, seq],

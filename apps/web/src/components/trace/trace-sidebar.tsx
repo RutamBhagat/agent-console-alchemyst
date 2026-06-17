@@ -1,11 +1,10 @@
 import JsonView from "@uiw/react-json-view";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, useEffect, useMemo, useRef } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import {
   isJsonEvent,
   type JsonEvent,
   type TraceDirection,
-  type TraceEntry,
   useTraceStore,
 } from "@/store/trace-store";
 import { useUiStore } from "@/store/ui-store";
@@ -18,25 +17,24 @@ type WorkerTraceMessage = {
 
 export function TraceSidebar() {
   const traces = useTraceStore((state) => state.traces);
-  const groupedTraces = useMemo(() => groupTokenTraces(traces), [traces]);
   const autoScroll = useUiStore((state) => state.autoScroll);
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
-    count: groupedTraces.length,
+    count: traces.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 180,
+    estimateSize: () => 220,
     overscan: 5,
   });
 
   useEffect(() => {
-    if (!autoScroll || groupedTraces.length === 0) return;
-    rowVirtualizer.scrollToIndex(groupedTraces.length - 1, { align: "end" });
-  }, [autoScroll, rowVirtualizer, groupedTraces.length]);
+    if (!autoScroll || traces.length === 0) return;
+    rowVirtualizer.scrollToIndex(traces.length - 1, { align: "end" });
+  }, [autoScroll, rowVirtualizer, traces.length]);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-col rounded-lg">
       <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
-        {groupedTraces.length === 0 ? (
+        {traces.length === 0 ? (
           <p className="text-sm text-muted-foreground">No trace events yet.</p>
         ) : (
           <div
@@ -44,7 +42,7 @@ export function TraceSidebar() {
             style={{ height: rowVirtualizer.getTotalSize() }}
           >
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const trace = groupedTraces[virtualRow.index];
+              const trace = traces[virtualRow.index];
               if (!trace) return null;
 
               const style: CSSProperties = {
@@ -68,15 +66,7 @@ export function TraceSidebar() {
                       <span>{trace.direction}</span>
                       <span>#{trace.id}</span>
                     </div>
-                    <div className="overflow-x-auto">
-                      <JsonView
-                        value={trace.event}
-                        collapsed={1}
-                        displayDataTypes={false}
-                        enableClipboard={false}
-                        style={{ fontSize: 12 }}
-                      />
-                    </div>
+                    <TraceBody event={trace.event} />
                   </div>
                 </div>
               );
@@ -88,47 +78,47 @@ export function TraceSidebar() {
   );
 }
 
-type TraceDisplayEntry = Omit<TraceEntry, "event"> & { event: JsonEvent };
+type TokenTraceEvent = JsonEvent & {
+  type: "TOKEN";
+  stream_id: string;
+  text: string;
+  token_count: number;
+  seq_range: string;
+};
 
-function groupTokenTraces(traces: TraceEntry[]): TraceDisplayEntry[] {
-  const grouped: TraceDisplayEntry[] = [];
-
-  for (const trace of traces) {
-    const last = grouped.at(-1);
-    if (canGroupTokenTrace(last, trace)) {
-      const firstSeq = String(last.event.seq).split("-")[0];
-      last.event = {
-        type: "TOKEN",
-        seq: `${firstSeq}-${trace.event.seq}`,
-        text: `${last.event.text}${trace.event.text}`,
-        stream_id: trace.event.stream_id,
-      };
-      continue;
-    }
-
-    grouped.push({ ...trace, event: { ...trace.event } });
-  }
-
-  return grouped;
-}
-
-function canGroupTokenTrace(
-  left: TraceDisplayEntry | undefined,
-  right: TraceEntry,
-): left is TraceDisplayEntry {
-  if (!left) return false;
+function TraceBody({ event }: { event: JsonEvent }) {
+  if (isTokenTraceEvent(event)) return <TokenTraceBody event={event} />;
 
   return (
-    left.direction === right.direction &&
-    left.direction === "server->worker" &&
-    left.event.type === "TOKEN" &&
-    right.event.type === "TOKEN" &&
-    (typeof left.event.seq === "number" || typeof left.event.seq === "string") &&
-    typeof right.event.seq === "number" &&
-    typeof left.event.text === "string" &&
-    typeof right.event.text === "string" &&
-    typeof left.event.stream_id === "string" &&
-    left.event.stream_id === right.event.stream_id
+    <div className="overflow-x-auto">
+      <JsonView
+        value={event}
+        collapsed={1}
+        displayDataTypes={false}
+        enableClipboard={false}
+        style={{ fontSize: 12 }}
+      />
+    </div>
+  );
+}
+
+function TokenTraceBody({ event }: { event: TokenTraceEvent }) {
+  return (
+    <div className="space-y-2">
+      <div className="font-mono text-[11px] text-muted-foreground">
+        TOKEN stream {event.stream_id} · seq {event.seq_range} · {event.token_count} chunks
+      </div>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 font-mono text-[11px]">{event.text}</pre>
+    </div>
+  );
+}
+function isTokenTraceEvent(event: JsonEvent): event is TokenTraceEvent {
+  return (
+    event.type === "TOKEN" &&
+    typeof event.stream_id === "string" &&
+    typeof event.text === "string" &&
+    typeof event.token_count === "number" &&
+    typeof event.seq_range === "string"
   );
 }
 

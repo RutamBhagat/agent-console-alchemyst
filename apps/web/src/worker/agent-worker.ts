@@ -10,6 +10,7 @@ type WorkerIn =
 type ConnectionStatus = "connected" | "reconnecting" | "resuming";
 type WorkerOut =
   | { type: "trace"; direction: TraceDirection; event: JsonEvent }
+  | { type: "protocol"; direction: TraceDirection; event: JsonEvent }
   | { type: "flush-last-turn" }
   | { type: "connection-status"; status: ConnectionStatus };
 
@@ -97,6 +98,7 @@ function handleClientMessageSent(message: JsonEvent) {
   if (message.type === "USER_MESSAGE") {
     sequenceGate.noteUserMessageSent();
     streamStallWatchdog.noteStreamStarted();
+    emitProtocolEvent("worker->server", message);
   }
 
   emitTrace("worker->server", message);
@@ -106,12 +108,12 @@ function handleServerMessage(raw: string) {
   const message = parseJsonObject(raw);
   if (!message) return;
 
-  tracePingImmediately(message);
+  emitTrace("server->worker", message);
   respondToPingImmediately(message);
   respondToToolCallImmediately(message);
 
   const next = sequenceGate.accept(message);
-  if (next) emitTrace("server->worker", next);
+  if (next) emitProtocolEvent("server->worker", next);
 }
 
 function markServerMessageProcessed(seq: number) {
@@ -124,7 +126,7 @@ function markServerMessageProcessed(seq: number) {
   }
 
   streamStallWatchdog.noteOrderedProgress(processed);
-  if (next) emitTrace("server->worker", next);
+  if (next) emitProtocolEvent("server->worker", next);
 }
 
 function isStreamLifecycleEvent(message: JsonEvent) {
@@ -146,10 +148,6 @@ function respondToToolCallImmediately(message: JsonEvent) {
 
   acknowledgedToolCallIds.add(message.call_id);
   sendToServer({ type: "TOOL_ACK", call_id: message.call_id });
-}
-
-function tracePingImmediately(message: JsonEvent) {
-  if (message.type === "PING") emitTrace("server->worker", message);
 }
 
 function respondToPingImmediately(message: JsonEvent) {
@@ -175,6 +173,11 @@ function parseJsonObject(raw: string): JsonEvent | null {
 
 function emitTrace(direction: TraceDirection, event: JsonEvent) {
   const message = { type: "trace", direction, event } satisfies WorkerOut;
+  globalThis.postMessage(message);
+}
+
+function emitProtocolEvent(direction: TraceDirection, event: JsonEvent) {
+  const message = { type: "protocol", direction, event } satisfies WorkerOut;
   globalThis.postMessage(message);
 }
 
