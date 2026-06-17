@@ -35,6 +35,10 @@ function handleSocketMessage(event: MessageEvent) {
     self.postMessage({ type: "clientEvent", direction: "in", message });
 
     switch (message.type) {
+      case "CONTEXT_SNAPSHOT": {
+        self.postMessage({ type: "statePatch", context: message });
+        return;
+      }
       case "PING": {
         const pong = { type: "PONG", echo: message.challenge } satisfies ClientMessage;
         socket?.send(JSON.stringify(pong));
