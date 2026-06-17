@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import { useChatStore } from "../store/chat-store";
 import { useContextStore } from "../store/context-store";
@@ -18,6 +18,12 @@ import {
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@agent-console-alchemyst/ui/components/sidebar";
 
 type WorkerFlushMessage = { type: "flush-last-turn" };
 type WorkerProtocolMessage = {
@@ -47,7 +53,10 @@ export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connected");
-  const [pendingProcessedSeqs, setPendingProcessedSeqs] = useState<number[]>([]);
+  const [sidebarsOpen, setSidebarsOpen] = useState(true);
+  const [pendingProcessedSeqs, setPendingProcessedSeqs] = useState<number[]>(
+    [],
+  );
   const addTrace = useTraceStore((state) => state.addTrace);
   const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
   const flushLastTurn = useChatStore((state) => state.flushLastTurn);
@@ -120,13 +129,22 @@ export default function Home() {
   }
 
   return (
-    <>
+    <SidebarProvider
+      open={sidebarsOpen}
+      onOpenChange={setSidebarsOpen}
+      style={{ "--sidebar-width": "30rem" } as CSSProperties}
+    >
       <ConnectionStatusPill status={connectionStatus} />
-      <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
+      <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
+      <Sidebar side="left" collapsible="offcanvas">
         <TraceSidebar />
+      </Sidebar>
+      <SidebarInset className="h-svh min-h-0 p-4">
         <ChatPanel onSubmitMessage={sendMessage} />
+      </SidebarInset>
+      <Sidebar side="right" collapsible="offcanvas">
         <ContextPanel />
-      </main>
-    </>
+      </Sidebar>
+    </SidebarProvider>
   );
 }

@@ -44,7 +44,7 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
   }
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-col rounded-lg border p-4">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border p-4">
       <div className="min-h-0 flex-1 space-y-3 overflow-auto pb-4">
         {messages.map((chatMessage) =>
           chatMessage.role === "user" ? (
