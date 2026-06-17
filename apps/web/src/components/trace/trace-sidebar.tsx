@@ -2,7 +2,13 @@
 
 import JsonView from "@uiw/react-json-view";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   Accordion,
   AccordionContent,
@@ -108,13 +114,13 @@ export function TraceSidebar({ events }: TraceSidebarProps) {
                 >
                   <AccordionItem value={accordionValue} className="border-0">
                     <AccordionTrigger className="py-2 text-xs hover:no-underline">
+                      <span className="mr-2 text-muted-foreground">
+                        {event.message.type}
+                      </span>
                       <span className="font-medium">
                         {event.direction === "in"
                           ? "server -> worker"
                           : "worker -> server"}
-                      </span>
-                      <span className="ml-auto mr-2 text-muted-foreground">
-                        {event.message.type}
                       </span>
                     </AccordionTrigger>
                     <AccordionContent className="pb-2">
