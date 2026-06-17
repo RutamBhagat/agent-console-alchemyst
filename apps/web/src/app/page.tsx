@@ -14,8 +14,10 @@ import {
 import { UserMessage } from "@/components/chat/user-message";
 import { ContextSidebar } from "@/components/context/context-sidebar";
 import { ToolTurn } from "@/components/tools/tool-turn";
+import { TraceSidebar } from "@/components/trace/trace-sidebar";
 import { useChatStore } from "@/stores/chat-store";
 import { useContextStore } from "@/stores/context-store";
+import { useTraceStore, type TraceEvent } from "@/stores/trace-store";
 import { useUtilStore } from "@/stores/util-store";
 import type {
   ContextSnapshotMessage,
@@ -27,6 +29,8 @@ type WorkerPatch = {
   chat?: ServerMessage;
   context?: ContextSnapshotMessage;
 };
+
+type WorkerEvent = WorkerPatch | TraceEvent;
 
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
@@ -41,13 +45,19 @@ export default function Home() {
     chats,
   } = useChatStore();
   const addContextSnapshot = useContextStore((state) => state.addContextSnapshot);
+  const { events: traceEvents, addTraceEvent, clearTraceEvents } = useTraceStore();
   const { fullscreen, mode, toggleMode } = useUtilStore();
 
   useEffect(() => {
     const worker = new Worker(
       new URL("../worker/agent-worker.ts", import.meta.url),
     );
-    worker.addEventListener("message", (event: MessageEvent<WorkerPatch>) => {
+    worker.addEventListener("message", (event: MessageEvent<WorkerEvent>) => {
+      if (event.data.type === "clientEvent") {
+        addTraceEvent(event.data);
+        return;
+      }
+
       if (event.data.context) addContextSnapshot(event.data.context);
 
       const chat = event.data.chat;
@@ -68,8 +78,17 @@ export default function Home() {
       worker.postMessage({ type: "disconnect" });
       worker.terminate();
       workerRef.current = undefined;
+      clearTraceEvents();
     };
-  }, [addContextSnapshot, addToken, addToolCall, addToolResult, endStream]);
+  }, [
+    addContextSnapshot,
+    addToken,
+    addToolCall,
+    addToolResult,
+    addTraceEvent,
+    clearTraceEvents,
+    endStream,
+  ]);
 
   useEffect(() => {
     if (mode !== "auto") return;
@@ -93,7 +112,9 @@ export default function Home() {
   return (
     <SidebarProvider style={{ "--sidebar-width": fullscreen ? "100rem" : "40rem" } as CSSProperties}>
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
-      <Sidebar side="left" collapsible="offcanvas"></Sidebar>
+      <Sidebar side="left" collapsible="offcanvas">
+        <TraceSidebar events={traceEvents} />
+      </Sidebar>
       <SidebarInset className="relative h-svh min-h-0 p-4">
         <main
           ref={mainRef}

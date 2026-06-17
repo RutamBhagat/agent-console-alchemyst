@@ -16,8 +16,7 @@ export function ContextSidebar() {
   const contextList = Object.entries(contexts)
     .flatMap(([id, snapshots]) => (snapshots.length ? [{ id, snapshots }] : []))
     .sort(
-      (a, b) =>
-        (b.snapshots.at(-1)?.seq ?? 0) - (a.snapshots.at(-1)?.seq ?? 0),
+      (a, b) => (b.snapshots.at(-1)?.seq ?? 0) - (a.snapshots.at(-1)?.seq ?? 0),
     );
   const selected =
     contextList.find((context) => context.id === contextId) ?? contextList[0];
@@ -32,18 +31,18 @@ export function ContextSidebar() {
   return (
     <aside className="flex h-svh min-h-0 flex-col border-l bg-background">
       <div className="border-b p-3">
-        <Button
-          className="mb-2"
-          variant="ghost"
-          size="icon-sm"
-          onClick={toggleFullscreen}
-        >
-          {fullscreen ? <Minimize2 /> : <Maximize2 />}
-          <span className="sr-only">
-            {fullscreen ? "Exit fullscreen" : "Fullscreen"}
-          </span>
-        </Button>
         <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            className="mb-2"
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? <Minimize2 /> : <Maximize2 />}
+            <span className="sr-only">
+              {fullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </span>
+          </Button>
           {contextList.map((context) => (
             <Button
               key={context.id}
