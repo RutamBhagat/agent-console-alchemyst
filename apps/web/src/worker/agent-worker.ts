@@ -1,3 +1,4 @@
+import { ResumeController } from "./resume-controller";
 import { SequenceGate, type JsonEvent } from "./sequence-gate";
 
 type TraceDirection = "worker->server" | "server->worker";
@@ -8,68 +9,28 @@ type WorkerIn =
 type WorkerOut = { type: "trace"; direction: TraceDirection; event: JsonEvent };
 
 const WS_URL = "ws://localhost:4747/ws";
-const encode = JSON.stringify;
 const sequenceGate = new SequenceGate();
-let socket: WebSocket | null = null;
-let hasOpened = false;
-const pending: JsonEvent[] = [];
-
-function connect() {
-  if (socket?.readyState === WebSocket.OPEN) return;
-  if (socket?.readyState === WebSocket.CONNECTING) return;
-
-  socket = new WebSocket(WS_URL);
-  socket.addEventListener("open", handleOpen);
-  socket.addEventListener("message", handleServerMessage);
-  socket.addEventListener("close", () => {
-    socket = null;
-  });
-}
-
-function handleOpen() {
-  if (hasOpened) {
-    sendOpenSocket({
-      type: "RESUME",
-      last_seq: sequenceGate.getLastProcessedSeq(),
-    });
-  }
-
-  hasOpened = true;
-  flush();
-}
-
-function flush() {
-  while (pending.length > 0 && socket?.readyState === WebSocket.OPEN) {
-    const next = pending.shift();
-    if (next) sendOpenSocket(next);
-  }
-}
+const resumeController = new ResumeController({
+  url: WS_URL,
+  getLastProcessedSeq: () => sequenceGate.getLastProcessedSeq(),
+  onMessage: handleServerMessage,
+  onSend: (message) => emitTrace("worker->server", message),
+});
 
 function send(content: string) {
   sequenceGate.noteUserMessageSent();
-  sendToServer({ type: "USER_MESSAGE", content });
+  resumeController.send({ type: "USER_MESSAGE", content });
 }
 
 function sendToServer(message: JsonEvent) {
-  if (socket?.readyState === WebSocket.OPEN) {
-    sendOpenSocket(message);
-    return;
-  }
-
-  pending.push(message);
-  connect();
+  resumeController.send(message);
 }
 
-function sendOpenSocket(message: JsonEvent) {
-  socket?.send(encode(message));
-  emitTrace("worker->server", message);
-}
-
-function handleServerMessage(event: MessageEvent) {
-  if (typeof event.data !== "string") return;
-
-  const message = parseJsonObject(event.data);
+function handleServerMessage(raw: string) {
+  const message = parseJsonObject(raw);
   if (!message) return;
+
+  respondToPingImmediately(message);
 
   const next = sequenceGate.accept(message);
   if (next) emitTrace("server->worker", next);
@@ -86,9 +47,10 @@ function markServerMessageProcessed(seq: number) {
 function respondAfterUiConsumption(message: JsonEvent) {
   if (message.type === "TOOL_CALL" && typeof message.call_id === "string") {
     sendToServer({ type: "TOOL_ACK", call_id: message.call_id });
-    return;
   }
+}
 
+function respondToPingImmediately(message: JsonEvent) {
   if (message.type !== "PING") return;
 
   const echo = typeof message.challenge === "string" ? message.challenge : "";
@@ -125,5 +87,5 @@ self.addEventListener("message", (event: MessageEvent<WorkerIn>) => {
   if (content) send(content);
 });
 
-connect();
+resumeController.connect();
 export {};

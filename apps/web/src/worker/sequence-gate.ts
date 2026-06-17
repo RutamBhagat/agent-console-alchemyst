@@ -16,6 +16,7 @@ export class SequenceGate {
   private inFlight: SequencedJsonEvent | null = null;
   private mayStartNewTurn = false;
   private readonly buffer = new Map<number, SequencedJsonEvent>();
+  private readonly restartBuffer = new Map<number, SequencedJsonEvent>();
 
   getLastProcessedSeq() {
     return this.lastProcessedSeq;
@@ -23,19 +24,29 @@ export class SequenceGate {
 
   noteUserMessageSent() {
     this.mayStartNewTurn = true;
+    this.restartBuffer.clear();
   }
 
   accept(message: JsonEvent) {
     const seq = getServerSeq(message);
     if (seq === null) return null;
 
-    if (this.shouldStartNewTurn(seq)) {
+    if (this.shouldConfirmRestart(seq)) {
       this.resetForNewTurn();
+      this.moveRestartCandidates();
+    } else if (this.shouldParkRestartCandidate(seq)) {
+      if (!this.restartBuffer.has(seq)) {
+        this.restartBuffer.set(seq, message as SequencedJsonEvent);
+      }
+      return null;
     } else if (seq <= this.lastProcessedSeq) {
+      this.mayStartNewTurn = false;
+      this.restartBuffer.clear();
       return null;
     }
 
     this.mayStartNewTurn = false;
+    this.restartBuffer.clear();
 
     if (this.inFlight?.seq === seq) return null;
     if (this.buffer.has(seq)) return null;
@@ -57,14 +68,25 @@ export class SequenceGate {
     return { processed, next: this.nextReady() };
   }
 
-  private shouldStartNewTurn(seq: number) {
+  private shouldConfirmRestart(seq: number) {
     return this.mayStartNewTurn && seq === 1 && this.lastProcessedSeq > 0;
+  }
+
+  private shouldParkRestartCandidate(seq: number) {
+    return this.mayStartNewTurn && seq > 1 && seq < this.lastProcessedSeq;
   }
 
   private resetForNewTurn() {
     this.lastProcessedSeq = 0;
     this.inFlight = null;
     this.buffer.clear();
+  }
+
+  private moveRestartCandidates() {
+    for (const [seq, message] of this.restartBuffer) {
+      this.buffer.set(seq, message);
+    }
+    this.restartBuffer.clear();
   }
 
   private nextReady() {
