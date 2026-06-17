@@ -1,157 +1,187 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, useState } from "react";
-
-import { useChatStore } from "../store/chat-store";
-import { useContextStore } from "../store/context-store";
-import {
-  isJsonEvent,
-  type JsonEvent,
-  type TraceDirection,
-  useTraceStore,
-} from "../store/trace-store";
-import {
-  type ConnectionStatus,
-  ConnectionStatusPill,
-  isConnectionStatusMessage,
-} from "@/components/connection-status-pill";
-import { ChatPanel } from "@/components/chat/chat-panel";
-import { ContextPanel } from "@/components/context/context-panel";
-import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
+import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import { env } from "@agent-console-alchemyst/env/web";
+import { Button } from "@agent-console-alchemyst/ui/components/button";
+import { Input } from "@agent-console-alchemyst/ui/components/input";
 import {
   Sidebar,
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@agent-console-alchemyst/ui/components/sidebar";
+import { UserMessage } from "@/components/chat/user-message";
+import { ContextSidebar } from "@/components/context/context-sidebar";
+import { ToolTurn } from "@/components/tools/tool-turn";
+import { TraceSidebar } from "@/components/trace/trace-sidebar";
+import { useChatStore } from "@/stores/chat-store";
+import { useContextStore } from "@/stores/context-store";
+import { useTraceStore, type TraceEvent } from "@/stores/trace-store";
+import { useUtilStore } from "@/stores/util-store";
+import type {
+  ContextSnapshotMessage,
+  ServerMessage,
+} from "../../../agent-server/src/types";
 
-type WorkerFlushMessage = { type: "flush-last-turn" };
-type WorkerProtocolMessage = {
-  type: "protocol";
-  direction: TraceDirection;
-  event: JsonEvent;
+type WorkerPatch = {
+  type: "statePatch";
+  chat?: ServerMessage;
+  context?: ContextSnapshotMessage;
 };
 
-function isFlushMessage(value: unknown): value is WorkerFlushMessage {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return (value as Partial<WorkerFlushMessage>).type === "flush-last-turn";
-}
+type RetryUserMessage = {
+  type: "retryUserMessage";
+  content: string;
+};
 
-function isProtocolMessage(value: unknown): value is WorkerProtocolMessage {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-
-  const candidate = value as Partial<WorkerProtocolMessage>;
-  return (
-    candidate.type === "protocol" &&
-    (candidate.direction === "worker->server" ||
-      candidate.direction === "server->worker") &&
-    isJsonEvent(candidate.event)
-  );
-}
+type WorkerEvent = WorkerPatch | TraceEvent | RetryUserMessage;
 
 export default function Home() {
-  const workerRef = useRef<Worker | null>(null);
-  const [connectionStatus, setConnectionStatus] =
-    useState<ConnectionStatus>("connected");
-  const [sidebarsOpen, setSidebarsOpen] = useState(true);
-  const [contextFullscreen, setContextFullscreen] = useState(false);
-  const [pendingProcessedSeqs, setPendingProcessedSeqs] = useState<number[]>(
-    [],
+  const workerRef = useRef<Worker>(undefined);
+  const mainRef = useRef<HTMLElement>(null);
+  const [message, setMessage] = useState("");
+  const {
+    addUserMessage,
+    addToken,
+    addToolCall,
+    addToolResult,
+    endStream,
+    retryUserMessage,
+    chats,
+  } = useChatStore();
+  const addContextSnapshot = useContextStore(
+    (state) => state.addContextSnapshot,
   );
-  const addTrace = useTraceStore((state) => state.addTrace);
-  const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
-  const flushLastTurn = useChatStore((state) => state.flushLastTurn);
-  const applyContextTraceEvent = useContextStore(
-    (state) => state.applyTraceEvent,
-  );
+  const {
+    events: traceEvents,
+    addTraceEvent,
+    clearTraceEvents,
+  } = useTraceStore();
+  const { fullscreen, mode, toggleMode } = useUtilStore();
 
   useEffect(() => {
     const worker = new Worker(
       new URL("../worker/agent-worker.ts", import.meta.url),
-      {
-        type: "module",
-      },
     );
-
-    function handleWorkerMessage(event: MessageEvent<unknown>) {
-      if (isConnectionStatusMessage(event.data)) {
-        setConnectionStatus(event.data.status);
+    worker.addEventListener("message", (event: MessageEvent<WorkerEvent>) => {
+      if (event.data.type === "clientEvent") {
+        addTraceEvent(event.data);
+        return;
+      }
+      if (event.data.type === "retryUserMessage") {
+        retryUserMessage({ type: "USER_MESSAGE", content: event.data.content });
         return;
       }
 
-      if (isFlushMessage(event.data)) {
-        flushLastTurn();
-        return;
+      if (event.data.context) addContextSnapshot(event.data.context);
+
+      const chat = event.data.chat;
+      if (!chat) return;
+
+      if (chat.type === "TOKEN") addToken(chat);
+      if (chat.type === "TOOL_CALL") {
+        addToolCall(chat);
+        worker.postMessage({ type: "toolAck", call_id: chat.call_id });
       }
-
-      if (isTraceMessage(event.data)) {
-        addTrace(event.data.direction, event.data.event);
-        return;
-      }
-
-      if (!isProtocolMessage(event.data)) return;
-
-      const { direction, event: protocolEvent } = event.data;
-      applyChatTraceEvent(direction, protocolEvent);
-      applyContextTraceEvent(direction, protocolEvent);
-
-      const seq = protocolEvent.seq;
-      if (direction === "server->worker" && typeof seq === "number") {
-        setPendingProcessedSeqs((seqs) =>
-          seqs.includes(seq) ? seqs : [...seqs, seq],
-        );
-      }
-    }
-
-    worker.addEventListener("message", handleWorkerMessage);
+      if (chat.type === "TOOL_RESULT") addToolResult(chat);
+      if (chat.type === "STREAM_END") endStream(chat);
+    });
+    worker.postMessage({ type: "connect", url: env.NEXT_PUBLIC_AGENT_WS_URL });
     workerRef.current = worker;
 
     return () => {
-      worker.removeEventListener("message", handleWorkerMessage);
+      worker.postMessage({ type: "disconnect" });
       worker.terminate();
-      workerRef.current = null;
+      workerRef.current = undefined;
+      clearTraceEvents();
     };
-  }, [addTrace, applyChatTraceEvent, applyContextTraceEvent, flushLastTurn]);
+  }, [
+    addContextSnapshot,
+    addToken,
+    addToolCall,
+    addToolResult,
+    addTraceEvent,
+    clearTraceEvents,
+    endStream,
+    retryUserMessage,
+  ]);
 
   useEffect(() => {
-    if (pendingProcessedSeqs.length === 0) return;
+    if (mode !== "auto") return;
+    mainRef.current?.scrollTo({
+      top: mainRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [chats, mode]);
 
-    const worker = workerRef.current;
-    if (!worker) return;
+  function submitMessage(event: React.SubmitEvent) {
+    event.preventDefault();
 
-    for (const seq of pendingProcessedSeqs) {
-      worker.postMessage({ type: "processed", seq });
-    }
-    setPendingProcessedSeqs([]);
-  }, [pendingProcessedSeqs]);
+    const content = message.trim();
+    if (!content) return;
 
-  function sendMessage(content: string) {
-    workerRef.current?.postMessage({ type: "send", content });
+    addUserMessage({ type: "USER_MESSAGE", content });
+    workerRef.current?.postMessage({ type: "sendUserMessage", content });
+    setMessage("");
   }
 
   return (
     <SidebarProvider
-      open={sidebarsOpen}
-      onOpenChange={setSidebarsOpen}
       style={
-        {
-          "--sidebar-width": contextFullscreen ? "100rem" : "30rem",
-        } as CSSProperties
+        { "--sidebar-width": fullscreen ? "100rem" : "30rem" } as CSSProperties
       }
     >
-      <ConnectionStatusPill status={connectionStatus} />
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
       <Sidebar side="left" collapsible="offcanvas">
-        <TraceSidebar />
+        <TraceSidebar events={traceEvents} />
       </Sidebar>
-      <SidebarInset className="h-svh min-h-0 p-4">
-        <ChatPanel onSubmitMessage={sendMessage} />
+      <SidebarInset className="relative h-svh min-h-0 p-4">
+        <main
+          ref={mainRef}
+          className="mx-auto flex h-full w-[min(760px,100%)] flex-col gap-4 overflow-y-auto pb-24 pt-8"
+        >
+          {chats.map((chat, index) =>
+            "type" in chat ? (
+              <UserMessage key={`user-${index}`} message={chat} />
+            ) : (
+              <article
+                key={chat.stream_id}
+                className="rounded-lg border bg-background p-4 shadow-sm"
+              >
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  {chat.text || " "}
+                </p>
+                <ToolTurn chat={chat} />
+              </article>
+            ),
+          )}
+        </main>
+        <form
+          onSubmit={submitMessage}
+          className="absolute bottom-6 left-1/2 flex w-[min(640px,calc(100%-2rem))] -translate-x-1/2 items-center gap-2"
+        >
+          <Button
+            type="button"
+            onClick={toggleMode}
+            className="h-10 px-4"
+            aria-pressed={mode === "auto"}
+          >
+            {mode === "auto" ? "Auto" : "Manual"}
+          </Button>
+          <Input
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Type a message"
+            className="h-10 bg-background"
+          />
+          <Button type="submit" className="h-10 px-4">
+            Submit
+          </Button>
+        </form>
       </SidebarInset>
       <Sidebar side="right" collapsible="offcanvas">
-        <ContextPanel
-          isFullscreen={contextFullscreen}
-          onToggleFullscreen={() => setContextFullscreen((value) => !value)}
-        />
+        <ContextSidebar />
       </Sidebar>
     </SidebarProvider>
   );

@@ -1,46 +1,78 @@
 # Decisions
 
-## Constraints and pivots
+## Reconnect and `RESUME`
 
-- The assignment described a replayable resumable agent, but the provided `apps/agent-server` behavior diverged from that contract under chaos mode.
-- The server was treated as read-only, so frontend recovery had to work around backend behavior instead of fixing protocol implementation bugs.
-- Chaos drops often aborted the active script, which meant `RESUME` could replay only already-generated events and could not create missing future tokens.
-- Because true resume was technically useless after an aborted script, the client pivots to resending the last user message when a resume makes no stream progress.
-- New prompts are queued/blocked during streaming because the mock server is single-session and clears or restarts history on a new `USER_MESSAGE`.
-- `TOOL_ACK` is sent immediately when a raw `TOOL_CALL` frame is seen, because waiting for ordered UI processing could miss the server's ACK timeout during chaos reordering.
+The app intentionally does not rely on `RESUME` for true mid-stream recovery after a socket drop. In this backend, reconnecting aborts the active generation script.
+`RESUME` can only replay events already stored in server history; it cannot make the backend continue generating the rest of the answer.
+That means a strict protocol-level resume can still leave the user with a partial stream, a missing `TOOL_RESULT`, or no `STREAM_END`.
 
-## Sequence ordering and deduplication
+For that reason, the client treats a mid-stream disconnect as a failed turn and replays the last user message on a fresh socket.
+This is the only way to get a complete answer without editing `apps/agent-server`.
+It is not pretending to be durable backend recovery; it is a frontend workaround for a backend that cannot resume an aborted script.
 
-`SequenceGate` is the protocol boundary. It keeps `lastProcessedSeq`, one `inFlight` event, and a `Map<number, event>` buffer keyed by `seq`; the map gives cheap dedupe, direct lookup for `lastProcessedSeq + 1`, and simple buffering for out-of-order delivery. Duplicate events are ignored if they are already processed, currently in flight, or already buffered.
+Sending `RESUME` after every socket close would add code and misleading logs without fixing the core failure. The backend has already stopped the script, so the client would still need a full turn replay to get a complete response.
+`RESUME` is only used for live sequence gaps while the connection still exists.
 
-The worker emits only the next ordered event to React. React applies it to the stores, then posts a `processed` acknowledgement back to the worker; only then does `SequenceGate` advance `lastProcessedSeq`. This keeps `RESUME.last_seq` tied to UI-consumed state, not merely socket-received state.
+## Processed Sequence Cursor
 
-There is one intentional restart path: after a user message, `SequenceGate` can accept a fresh `seq: 1` as a new turn. That exists because the mock server restarts numbering/history in cases where the documented protocol implied a continuous replay stream.
+The worker owns ordering, deduplication, and the `lastAppliedSeq` cursor. A message is considered applied when the worker has accepted it in order and posted the state patch to the UI.
+The stricter interpretation would require a worker -> UI -> worker acknowledgement after React commits the render, but that extra round trip is not useful here.
 
-## Streaming, tools, and layout stability
+The heavy protocol work is already outside the main thread. The main thread only updates Zustand stores and renders the relevant panels.
+Trace rows are virtualized, context diffs use a virtualized viewer, and selectors limit component updates to the state they actually use.
+In practice, acknowledging after the worker posts the patch is the right complexity boundary for this app.
 
-Chat state is stored as ordered agent parts: text parts hold token chunks by `seq`, and tool parts are separate records keyed by `call_id`. A `TOOL_CALL` inserts a stable card below the frozen text part, while later tokens resume in the next text part, so the already-rendered text is not rebuilt into a different shape.
+## Pings in the Sequence Stream
 
-The UI uses stable React keys, normal document flow, `whitespace-pre-wrap`, bounded scroll containers, and compact accordion tool cards. That keeps tool interruptions from flickering or overwriting streamed text, and it avoids a large layout jump when a tool result arrives.
+`PING` messages are answered immediately when they arrive, before waiting for the sequence gate. Heartbeats are liveness traffic, so delaying `PONG` behind missing application messages would be the wrong behavior.
 
-## Reconnection and recovery
+The sequence gate still advances through `PING` because the backend puts heartbeats in the same global, gapless `seq` stream as application events.
+If the client refused to advance through pings, later messages could remain blocked forever.
+This is a backend protocol flaw: heartbeats should not share the same application recovery cursor.
+Duplicate/replayed pings are tracked so the client does not spam unexpected duplicate `PONG`s.
 
-WebSocket work runs inside a Web Worker so reconnect loops, heartbeats, sequence buffering, and stall detection do not compete with React rendering. The reconnect controller uses the required backoff sequence and sends `RESUME` before normal queued messages on reconnect.
+## Tool Acknowledgements
 
-The stream watchdog handles the backend failure mode the spec did not cover: a socket reconnects successfully but no more ordered stream events arrive because the server killed the active script. In that case, the client first tries reconnect/resume; if `lastStreamProgressSeq` does not advance, it flushes the partial last turn and resends the last user message.
+The client sends `TOOL_ACK` immediately after the tool call has been accepted into UI state.
+Waiting for a separate DOM paint acknowledgement would add the same unnecessary worker/UI round trip as the sequence cursor case.
 
-This resend workaround is a deliberate compromise. It preserves an interactive demo against the fixed mock server, but it is not equivalent to protocol-level continuation because any already-shown partial answer from the aborted run must be discarded to avoid duplicate or contradictory output.
+There is also a backend race in chaos mode: when tool calls are buffered by the server's chaos reordering path, the server can start its ACK timeout before the client has actually received the `TOOL_CALL`.
+Even immediate ACKs cannot prevent those violations because the client cannot acknowledge a message it has not seen.
+Fixing that would require backend changes.
 
-## Trace and context panels
+## Tool Call Rendering Model
 
-The trace store groups token frames into one expandable token row per stream instead of rendering one row per token. The sidebar is virtualized with `@tanstack/react-virtual`, which keeps high-rate token streams usable.
+Chat text is stored by `stream_id`, and tool calls/results are stored by `call_id`.
+This keeps updates cheap and direct, and it matches the architecture I would want if the backend supported multiple streams or concurrent tool calls properly.
+A tool result can update the matching card without scanning a transcript array.
 
-Context snapshots are stored by `context_id` and sorted by `seq`. The inspector intentionally uses two JSON libraries: `@uiw/react-json-view` for normal object viewing, and `virtual-react-json-diff` only for diffs, because the non-virtual diff path blocked the main thread on very large JSON during the second comparison, especially when one side of the diff was empty.
+The tradeoff is that the UI currently renders one growing text block and the tool cards below it, rather than splitting the assistant response into exact chronological text/card/text segments.
+I chose this because tool cards are mostly debugging/supporting information and can become blockers while reading the main answer.
+The intended UI direction is for tool cards to be collapsed by default.
 
-## If this needed 50 concurrent streams
+## Keyed Tool State
 
-I would move from one global `SequenceGate` and one chat timeline to per-session or per-stream protocol state, with windowed retention and explicit stream ownership in the UI stores. The worker model still fits, but messages would need routing by connection/session/stream id and the visible UI would subscribe only to rows currently on screen.
+Tool calls are stored in a keyed object because `call_id` is the stable identity that matters when results arrive.
+The important operation is "update the card for this call id", not "append another item to a list".
+This also keeps the shape ready for rapid or concurrent tool calls, even though the current backend does not fully support that behavior.
 
-## If responses were 100x longer
+## Trace Token Grouping
 
-I would stop keeping every token as React-rendered state forever. The client should compact completed text ranges, virtualize chat transcript rendering, persist old trace/context data outside hot Zustand state, and keep only recent ordered events in memory once they are no longer needed for replay or highlighting.
+The trace groups token events, but it intentionally reuses the chat stream text instead of stitching a second copy of token text inside the trace store.
+This keeps the trace simple and avoids duplicating streaming assembly logic in two places.
+The trace is a debugging aid; the chat store remains the source of truth for the rendered stream text.
+
+The tradeoff is that the expanded token row shows the stream text as assembled by the chat state, not a separately preserved per-batch text and duration.
+
+## Trace Linking
+
+Bidirectional trace/chat highlighting was de-scoped.
+It would require DOM refs, scroll coordination, highlight state, and edge-case handling across virtualized rows.
+That adds ceremony and complexity without improving the core chaos survival path: ordering, dedupe, heartbeats, tool ACKs, context display, and reconnect behavior.
+
+## Context History on Retry
+
+When a reconnect triggers a full turn replay, chat state is rewound to the last user message, but context snapshots are kept.
+This is intentional.
+The context panel acts as evidence that a rewind/retry happened, rather than pretending the first attempt never existed.
+It makes the backend limitation visible during debugging while keeping the chat readable for the user.

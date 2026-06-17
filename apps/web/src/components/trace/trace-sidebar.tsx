@@ -1,228 +1,191 @@
+"use client";
+
 import JsonView from "@uiw/react-json-view";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  type ComponentProps,
-  forwardRef,
-  memo,
-  type CSSProperties,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import {
-  isJsonEvent,
-  type JsonEvent,
-  type TraceEntry,
-  type TraceDirection,
-  useTraceStore,
-} from "@/store/trace-store";
-import { useUiStore } from "@/store/ui-store";
-import { Input } from "@agent-console-alchemyst/ui/components/input";
-import {
-  SidebarContent,
-  SidebarHeader,
-} from "@agent-console-alchemyst/ui/components/sidebar";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@agent-console-alchemyst/ui/components/accordion";
+import { cn } from "@agent-console-alchemyst/ui/lib/utils";
+import { useChatStore } from "@/stores/chat-store";
+import type { StoredTraceEvent } from "@/stores/trace-store";
+import { useUtilStore } from "@/stores/util-store";
 
-type WorkerTraceMessage = {
-  type: "trace";
-  direction: TraceDirection;
-  event: JsonEvent;
-};
+interface TraceSidebarProps {
+  events: StoredTraceEvent[];
+}
 
-export function TraceSidebar() {
-  const traces = useTraceStore((state) => state.traces);
-  const autoScroll = useUiStore((state) => state.autoScroll);
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const visibleTraces = useMemo(
-    () =>
-      deferredSearch
-        ? traces.filter((trace) => traceMatchesSearch(trace, deferredSearch))
-        : traces,
-    [deferredSearch, traces],
+export function TraceSidebar({ events }: TraceSidebarProps) {
+  const streams = useChatStore((state) => state.streams);
+  const mode = useUtilStore((state) => state.mode);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(() => new Set());
+  const eventTypes = useMemo(
+    () => [...new Set(events.map((event) => event.message.type))].sort(),
+    [events],
   );
-  const parentRef = useRef<HTMLDivElement | null>(null);
+  const visibleEvents = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase();
+
+    return events.filter((event) => {
+      if (hiddenTypes.has(event.message.type)) {
+        return false;
+      }
+
+      return trimmedQuery
+        ? JSON.stringify(event.message).toLowerCase().includes(trimmedQuery)
+        : true;
+    });
+  }, [events, hiddenTypes, query]);
   const rowVirtualizer = useVirtualizer({
-    count: visibleTraces.length,
+    count: visibleEvents.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 220,
-    overscan: 5,
+    estimateSize: () => 136,
+    overscan: 6,
   });
 
   useEffect(() => {
-    if (!autoScroll || visibleTraces.length === 0) return;
-    const frame = requestAnimationFrame(() => {
-      rowVirtualizer.scrollToIndex(visibleTraces.length - 1, { align: "end" });
+    if (mode !== "auto") return;
+
+    parentRef.current?.scrollTo({
+      top: parentRef.current.scrollHeight,
+      behavior: "smooth",
     });
-    return () => cancelAnimationFrame(frame);
-  }, [autoScroll, rowVirtualizer, visibleTraces.length]);
+  }, [events, mode]);
 
   return (
-    <>
-      <SidebarHeader className="gap-3 pt-14">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">Protocol</h2>
-          <span className="font-mono text-xs text-muted-foreground">
-            {visibleTraces.length}/{traces.length}
-          </span>
-        </div>
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+    <aside className="flex h-full min-h-0 flex-col border-r bg-background">
+      <div className="border-b py-2 px-3 pr-2">
+        <h2 className="text-sm pl-10 font-medium">Trace</h2>
+        <p className="text-xs pl-10 text-muted-foreground">
+          {visibleEvents.length} / {events.length} events
+        </p>
+        <input
+          aria-label="Search trace events"
+          className="mt-2 h-8 w-full rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           placeholder="Search events"
-          className="h-8"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
         />
-      </SidebarHeader>
-      <SidebarContent ref={parentRef} className="px-2 pb-2">
-        {visibleTraces.length === 0 ? (
-          <p className="px-2 text-sm text-muted-foreground">
-            {traces.length === 0 ? "No trace events yet." : "No matching events."}
-          </p>
-        ) : (
-          <div
-            className="relative w-full"
-            style={{ height: rowVirtualizer.getTotalSize() }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const trace = visibleTraces[virtualRow.index];
-              if (!trace) return null;
-
-              const style: CSSProperties = {
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${virtualRow.start}px)`,
-              };
-
-              return (
-                <TraceRow
-                  key={trace.id}
-                  ref={rowVirtualizer.measureElement}
-                  trace={trace}
-                  data-index={virtualRow.index}
-                  style={style}
-                />
-              );
-            })}
-          </div>
-        )}
-      </SidebarContent>
-    </>
-  );
-}
-
-const TraceRow = memo(
-  forwardRef<HTMLDivElement, { trace: TraceEntry; style: CSSProperties } & ComponentProps<"div">>(
-    function TraceRow({ trace, style, ...props }, ref) {
-      const callId = getCallId(trace.event);
-      const linkClass = callId ? callIdClass(callId) : "border-border";
-
-      return (
-        <div ref={ref} className="pb-3" style={style} {...props}>
-          <div className={`rounded-md border border-l-4 p-2 text-xs ${linkClass}`}>
-            <div className="mb-2 flex items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
-              <span>{trace.direction}</span>
-              <span>#{trace.id}</span>
-            </div>
-            {callId ? (
-              <div className="mb-2 inline-flex max-w-full rounded bg-muted px-2 py-1 font-mono text-[11px]">
-                <span className="truncate">call_id {callId}</span>
-              </div>
-            ) : null}
-            <TraceBody event={trace.event} />
-          </div>
-        </div>
-      );
-    },
-  ),
-);
-
-type TokenTraceEvent = JsonEvent & {
-  type: "TOKEN";
-  stream_id: string;
-  text: string;
-  token_count: number;
-  seq_range: string;
-};
-
-function TraceBody({ event }: { event: JsonEvent }) {
-  if (isTokenTraceEvent(event)) return <TokenTraceBody event={event} />;
-
-  return (
-    <div className="overflow-x-auto">
-      <JsonView
-        value={event}
-        collapsed={1}
-        displayDataTypes={false}
-        enableClipboard={false}
-        style={{ fontSize: 12 }}
-      />
-    </div>
-  );
-}
-
-function TokenTraceBody({ event }: { event: TokenTraceEvent }) {
-  return (
-    <div className="space-y-2">
-      <div className="font-mono text-[11px] text-muted-foreground">
-        TOKEN stream {event.stream_id} · seq {event.seq_range} · {event.token_count} chunks
       </div>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 font-mono text-[11px]">{event.text}</pre>
-    </div>
-  );
-}
-function isTokenTraceEvent(event: JsonEvent): event is TokenTraceEvent {
-  return (
-    event.type === "TOKEN" &&
-    typeof event.stream_id === "string" &&
-    typeof event.text === "string" &&
-    typeof event.token_count === "number" &&
-    typeof event.seq_range === "string"
-  );
-}
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-y-auto p-2">
+        <div
+          className="relative w-full"
+          style={{ height: rowVirtualizer.getTotalSize() }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+            const event = visibleEvents[virtualItem.index];
+            const accordionValue =
+              "seq" in event.message
+                ? `${event.direction}-${event.message.type}-${event.message.seq}`
+                : "firstSeq" in event.message
+                  ? `${event.direction}-${event.message.type}-${event.message.firstSeq}`
+                  : `${event.direction}-${event.message.type}-${virtualItem.index}`;
 
-function traceMatchesSearch(trace: TraceEntry, query: string) {
-  return `${trace.direction} ${trace.id} ${JSON.stringify(trace.event) ?? ""}`
-    .toLowerCase()
-    .includes(query);
-}
+            return (
+              <article
+                key={virtualItem.key}
+                ref={rowVirtualizer.measureElement}
+                data-index={virtualItem.index}
+                className="absolute left-0 top-0 w-full pb-2"
+                style={{ transform: `translateY(${virtualItem.start}px)` }}
+              >
+                <Accordion
+                  key={accordionValue}
+                  type="single"
+                  collapsible
+                  defaultValue={
+                    event.message.type === "TOKEN" ? undefined : accordionValue
+                  }
+                  className={cn(
+                    "rounded-md border px-2",
+                    event.message.type === "STREAM_END" && "bg-green-100",
+                  )}
+                >
+                  <AccordionItem value={accordionValue} className="border-0">
+                    <AccordionTrigger className="py-2 text-xs hover:no-underline">
+                      <span className="mr-2 text-muted-foreground">
+                        {event.message.type}
+                      </span>
+                      <span className="font-medium">
+                        {event.direction === "in"
+                          ? "server -> worker"
+                          : "worker -> server"}
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-2">
+                      <JsonView
+                        value={
+                          event.direction === "in" &&
+                          event.message.type === "TOKEN"
+                            ? {
+                                ...event.message,
+                                text:
+                                  streams[event.message.stream_id]?.text ?? "",
+                              }
+                            : event.message
+                        }
+                        collapsed={1}
+                        displayDataTypes={false}
+                        displayObjectSize={false}
+                        enableClipboard={false}
+                        shortenTextAfterLength={80}
+                        style={
+                          {
+                            fontSize: 12,
+                            "--w-rjv-background-color": "transparent",
+                          } as CSSProperties
+                        }
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1 p-2">
+        {eventTypes.map((type) => {
+          const isVisible = !hiddenTypes.has(type);
 
-function getCallId(event: JsonEvent) {
-  if (
-    (event.type === "TOOL_CALL" ||
-      event.type === "TOOL_ACK" ||
-      event.type === "TOOL_RESULT") &&
-    typeof event.call_id === "string"
-  ) {
-    return event.call_id;
-  }
-  return null;
-}
-
-function callIdClass(callId: string) {
-  const classes = [
-    "border-l-sky-500 bg-sky-500/5",
-    "border-l-emerald-500 bg-emerald-500/5",
-    "border-l-amber-500 bg-amber-500/5",
-    "border-l-fuchsia-500 bg-fuchsia-500/5",
-    "border-l-rose-500 bg-rose-500/5",
-  ];
-  let hash = 0;
-  for (const char of callId) hash = (hash + char.charCodeAt(0)) % classes.length;
-  return classes[hash];
-}
-
-export function isTraceMessage(value: unknown): value is WorkerTraceMessage {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-
-  const candidate = value as Partial<WorkerTraceMessage>;
-  return (
-    candidate.type === "trace" &&
-    (candidate.direction === "worker->server" ||
-      candidate.direction === "server->worker") &&
-    isJsonEvent(candidate.event)
+          return (
+            <button
+              key={type}
+              className={`rounded-md border px-2 py-1 text-xs ${
+                isVisible
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground"
+              }`}
+              type="button"
+              aria-pressed={isVisible}
+              onClick={() =>
+                setHiddenTypes((current) => {
+                  const next = new Set(current);
+                  if (next.has(type)) {
+                    next.delete(type);
+                  } else {
+                    next.add(type);
+                  }
+                  return next;
+                })
+              }
+            >
+              {type}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
   );
 }

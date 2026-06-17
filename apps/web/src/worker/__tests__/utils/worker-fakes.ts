@@ -1,0 +1,64 @@
+import { vi } from "vitest";
+
+type Listener = (event: MessageEvent) => void;
+
+export class FakeWorkerScope {
+  messages: unknown[] = [];
+  private listener?: (event: MessageEvent<unknown>) => void;
+
+  addEventListener(_type: "message", listener: (event: MessageEvent<unknown>) => void) {
+    this.listener = listener;
+  }
+
+  postMessage(message: unknown) {
+    this.messages.push(message);
+  }
+
+  uiMessage(data: unknown) {
+    this.listener?.({ data } as MessageEvent<unknown>);
+  }
+}
+
+export class FakeWebSocket {
+  static OPEN = 1;
+  static latest?: FakeWebSocket;
+  readyState = FakeWebSocket.OPEN;
+  sent: string[] = [];
+  private listeners: Partial<Record<"open" | "close" | "message", Listener>> = {};
+
+  constructor(readonly url: string) {
+    FakeWebSocket.latest = this;
+  }
+
+  addEventListener(type: "open" | "close" | "message", listener: Listener) {
+    this.listeners[type] = listener;
+  }
+
+  send(data: string) {
+    this.sent.push(data);
+  }
+
+  close() {}
+
+  open() {
+    this.listeners.open?.({} as MessageEvent);
+  }
+
+  serverClose() {
+    this.readyState = 3;
+    this.listeners.close?.({} as MessageEvent);
+  }
+
+  serverMessage(data: string) {
+    this.listeners.message?.({ data } as MessageEvent);
+  }
+}
+
+export function installWorkerFakes() {
+  const workerScope = new FakeWorkerScope();
+  FakeWebSocket.latest = undefined;
+  vi.resetModules();
+  vi.stubGlobal("self", workerScope);
+  vi.stubGlobal("WebSocket", FakeWebSocket);
+  return workerScope;
+}
