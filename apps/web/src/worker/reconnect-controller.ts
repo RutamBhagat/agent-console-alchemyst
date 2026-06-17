@@ -6,11 +6,14 @@ type Wire = EventTarget & {
   close: () => void;
 };
 
+export type ConnectionStatus = "connected" | "reconnecting" | "resuming";
+
 type ReconnectControllerOptions = {
   url: string;
   onMessage: (raw: string) => void;
   onReconnect: () => void;
   onSend: (message: JsonEvent) => void;
+  onStatus: (status: ConnectionStatus) => void;
 };
 
 const OPEN = 1;
@@ -54,6 +57,15 @@ export function createReconnectController(options: ReconnectControllerOptions) {
     connect();
   }
 
+  function forceReconnect() {
+    if (socket?.readyState === OPEN || socket?.readyState === CONNECTING) {
+      socket.close();
+      return;
+    }
+
+    connect();
+  }
+
   function handleOpen(openedSocket: Wire) {
     if (openedSocket !== socket) return;
 
@@ -63,10 +75,12 @@ export function createReconnectController(options: ReconnectControllerOptions) {
 
     if (isReconnect) {
       pending.length = 0;
+      options.onStatus("resuming");
       options.onReconnect();
       return;
     }
 
+    options.onStatus("connected");
     flush();
   }
 
@@ -80,6 +94,7 @@ export function createReconnectController(options: ReconnectControllerOptions) {
     if (closedSocket !== socket) return;
 
     socket = null;
+    options.onStatus("reconnecting");
     scheduleReconnect();
   }
 
@@ -106,6 +121,6 @@ export function createReconnectController(options: ReconnectControllerOptions) {
     options.onSend(message);
   }
 
-  return { connect, send };
+  return { connect, send, forceReconnect };
 }
 

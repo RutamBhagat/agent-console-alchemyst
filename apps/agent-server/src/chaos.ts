@@ -132,7 +132,7 @@ export function generateChaosConfig(): ChaosConfig {
   return {
     // Drop after 15-45 messages (roughly mid-stream for most scripts)
     dropAfterMessages:
-      Math.random() < 0.5 ? 15 + Math.floor(Math.random() * 30) : null,
+      Math.random() < 0.8 ? 15 + Math.floor(Math.random() * 30) : null,
     reorderProbability: 0.15 + Math.random() * 0.2, // 15-35%
     duplicateProbability: 0.05 + Math.random() * 0.1, // 5-15%
     latencySpikeProbability: 0.05 + Math.random() * 0.08, // 5-13%

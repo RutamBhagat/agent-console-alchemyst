@@ -28,7 +28,20 @@ export function isJsonEvent(value: unknown): value is JsonEvent {
 export const useTraceStore = create<TraceState>((set) => ({
   traces: [],
   addTrace: (direction, event) =>
-    set((state) => ({
-      traces: [...state.traces, { id: nextTraceId++, direction, event }],
-    })),
+    set((state) => {
+      if (
+        direction === "server->worker" &&
+        typeof event.seq === "number" &&
+        state.traces.some(
+          (trace) =>
+            trace.direction === direction && trace.event.seq === event.seq,
+        )
+      ) {
+        return state;
+      }
+
+      return {
+        traces: [...state.traces, { id: nextTraceId++, direction, event }],
+      };
+    }),
 }));
