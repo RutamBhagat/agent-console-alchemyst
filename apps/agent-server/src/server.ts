@@ -8,7 +8,7 @@ import {
   ServerMode,
   ChaosConfig,
 } from "./types.js";
-import { selectScript } from "./scripts.js";
+import { selectScript } from "./scripts/index.js";
 import { ChaosEngine, generateChaosConfig } from "./chaos.js";
 
 // ─────────────────────────────────────────────────────────────
@@ -325,7 +325,7 @@ export class AgentServer {
 
   private async runScript(
     ws: WebSocket,
-    script: (typeof import("./scripts.js").RESPONSE_SCRIPTS)[number],
+    script: (typeof import("./scripts/index.js").RESPONSE_SCRIPTS)[number],
   ): Promise<void> {
     const streamId = `s_${randomUUID().slice(0, 8)}`;
     const abort = new AbortController();
