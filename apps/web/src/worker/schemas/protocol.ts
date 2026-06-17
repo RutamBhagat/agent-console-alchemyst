@@ -54,4 +54,8 @@ export const WorkerMessageSchema = z.discriminatedUnion("type", [
     url: z.string().default("ws://localhost:4747/ws"),
   }),
   z.object({ type: z.literal("disconnect") }),
+  z.object({
+    type: z.literal("sendUserMessage"),
+    content: z.string(),
+  }),
 ]);

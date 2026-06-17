@@ -20,7 +20,9 @@ export class FakeWorkerScope {
 }
 
 export class FakeWebSocket {
+  static OPEN = 1;
   static latest?: FakeWebSocket;
+  readyState = FakeWebSocket.OPEN;
   sent: string[] = [];
   private listener?: Listener;
 

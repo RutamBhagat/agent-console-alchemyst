@@ -18,6 +18,14 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
       socket?.close();
       socket = undefined;
       return;
+    case "sendUserMessage": {
+      const userMessage = { type: "USER_MESSAGE", content: message.content } satisfies ClientMessage;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(userMessage));
+        self.postMessage({ type: "clientEvent", direction: "out", message: userMessage });
+      }
+      return;
+    }
   }
 });
 
