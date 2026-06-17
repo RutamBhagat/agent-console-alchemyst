@@ -8,7 +8,9 @@ import type { JsonValue } from "@/app/trace-store";
 export function ContextPanel() {
   const contexts = useContextStore((state) => state.contexts);
   const activeContextId = useContextStore((state) => state.activeContextId);
-  const setActiveContextId = useContextStore((state) => state.setActiveContextId);
+  const setActiveContextId = useContextStore(
+    (state) => state.setActiveContextId,
+  );
   const contextIds = Object.keys(contexts).sort();
   const snapshots = activeContextId ? (contexts[activeContextId] ?? []) : [];
   const [index, setIndex] = useState(0);
@@ -60,7 +62,9 @@ export function ContextPanel() {
       ) : null}
 
       {snapshots.length === 0 || !current ? (
-        <p className="text-sm text-muted-foreground">No context snapshots yet.</p>
+        <p className="text-sm text-muted-foreground">
+          No context snapshots yet.
+        </p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           {safeIndex === 0 || !previous ? (
@@ -75,7 +79,7 @@ export function ContextPanel() {
             <VirtualDiffViewer
               oldValue={asObject(previous.data)}
               newValue={asObject(current.data)}
-              height={600}
+              height={2000}
               hideSearch
               leftTitle={`seq ${previous.seq}`}
               rightTitle={`seq ${current.seq}`}

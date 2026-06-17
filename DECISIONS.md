@@ -1,0 +1,1 @@
+- The client queues new prompts instead of sending them mid-stream because the provided single-session backend aborts the active stream and clears history on every new `USER_MESSAGE`; true concurrent streams require backend support for multiple active `stream_id`s.

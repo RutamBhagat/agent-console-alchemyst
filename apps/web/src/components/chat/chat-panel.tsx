@@ -10,6 +10,10 @@ type ChatPanelProps = {
 
 export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
   const messages = useChatStore((state) => state.messages);
+  const isStreaming = messages.some(
+    (chatMessage) =>
+      chatMessage.role === "agent" && chatMessage.status === "streaming",
+  );
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [message, setMessage] = useState("");
 
@@ -21,7 +25,7 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
     event.preventDefault();
 
     const content = message.trim();
-    if (!content) return;
+    if (!content || isStreaming) return;
 
     onSubmitMessage(content);
     setMessage("");
@@ -62,7 +66,13 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
           value={message}
           onChange={(event) => setMessage(event.target.value)}
         />
-        <Button type="submit">Submit</Button>
+        <Button type="submit" disabled={isStreaming}>
+          {isStreaming ? (
+            <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            "Submit"
+          )}
+        </Button>
       </form>
     </section>
   );
