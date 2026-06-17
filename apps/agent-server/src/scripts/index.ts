@@ -1,4 +1,4 @@
-import { ResponseScript } from "../types.js";
+import { ResponseScript } from "../types/index.js";
 import { greetingScript } from "./responseScripts/1-greeting.js";
 import { reportSummaryScript } from "./responseScripts/2-report.js";
 import { multiToolScript } from "./responseScripts/3-multi_tool.js";

@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 2. Report summary — context + one tool call ───────────
 export const reportSummaryScript = {

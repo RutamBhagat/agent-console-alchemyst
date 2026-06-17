@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 3. Multi-tool analysis — two tool calls ───────────────
 export const multiToolScript = {

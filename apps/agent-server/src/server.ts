@@ -1,15 +1,15 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket, RawData } from "ws";
-import {
-  ServerMessage,
-  ClientMessage,
-  ClientLogEntry,
-  ServerMode,
-  ChaosConfig,
-} from "./types.js";
 import { selectScript } from "./scripts/index.js";
 import { ChaosEngine, generateChaosConfig } from "./chaos.js";
+import {
+  ChaosConfig,
+  ClientLogEntry,
+  ClientMessage,
+  ServerMessage,
+  ServerMode,
+} from "./types/index.js";
 
 // ─────────────────────────────────────────────────────────────
 // AgentServer

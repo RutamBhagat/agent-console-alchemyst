@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 6. Long response — many tokens + tool call ────────────
 export const longResponseScript = {

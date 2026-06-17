@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 4. Immediate tool call — tool before any tokens ───────
 export const lookupScript = {

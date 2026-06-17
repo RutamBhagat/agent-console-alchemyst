@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 1. Simple greeting — no tools, short stream ───────────
 export const greetingScript = {

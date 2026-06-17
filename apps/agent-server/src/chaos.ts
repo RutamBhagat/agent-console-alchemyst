@@ -1,4 +1,4 @@
-import { ChaosConfig, ServerMessage } from "./types.js";
+import { ChaosConfig, ServerMessage } from "./types/index.js";
 
 // ─────────────────────────────────────────────────────────────
 // ChaosEngine

@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 
 // ── 7. Default — moderate response with one tool call ─────
 export const defaultResponseScript = {

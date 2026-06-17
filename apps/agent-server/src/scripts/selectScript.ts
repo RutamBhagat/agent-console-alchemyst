@@ -1,4 +1,4 @@
-import { ResponseScript } from "../types.js";
+import { ResponseScript } from "../types/index.js";
 import { RESPONSE_SCRIPTS } from "./index.js";
 
 /**

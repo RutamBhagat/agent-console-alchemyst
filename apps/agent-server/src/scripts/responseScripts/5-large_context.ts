@@ -1,4 +1,4 @@
-import { ResponseScript } from "../../types.js";
+import { ResponseScript } from "../../types/index.js";
 import { generateLargeContext } from "../utils/generateLargeContext-dont-read-this.js";
 
 // ── 5. Large context — oversized payload ──────────────────
