@@ -56,6 +56,12 @@ function handleServerMessage(event: MessageEvent) {
   if (!message) return;
 
   emitTrace("server->worker", message);
+
+  if (message.type === "TOOL_CALL" && typeof message.call_id === "string") {
+    sendToServer({ type: "TOOL_ACK", call_id: message.call_id });
+    return;
+  }
+
   if (message.type !== "PING") return;
 
   const echo = typeof message.challenge === "string" ? message.challenge : "";

@@ -1,8 +1,10 @@
 import { Button } from "@agent-console-alchemyst/ui/components/button";
 import { Input } from "@agent-console-alchemyst/ui/components/input";
+import JsonView from "@uiw/react-json-view";
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 
-import { getAgentText, useChatStore } from "@/store/chat-store";
+import { useChatStore } from "@/store/chat-store";
+import type { JsonValue } from "@/store/trace-store";
 import { useUiStore } from "@/store/ui-store";
 
 type ChatPanelProps = {
@@ -49,9 +51,30 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
           ) : (
             <div
               key={chatMessage.id}
-              className="max-w-full rounded-lg border p-3 text-sm"
+              className="max-w-full space-y-3 rounded-lg border p-3 text-sm"
             >
-              <p className="whitespace-pre-wrap">{getAgentText(chatMessage)}</p>
+              {chatMessage.parts.map((part, index) =>
+                part.kind === "text" ? (
+                  <p key={`text-${index}`} className="whitespace-pre-wrap">
+                    {getTextPartText(part.tokens)}
+                  </p>
+                ) : (
+                  <div key={part.callId} className="rounded-md border p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+                      <span className="font-mono">{part.toolName}</span>
+                      <span className="text-muted-foreground">
+                        {part.status}
+                      </span>
+                    </div>
+                    <div className="space-y-2 overflow-x-auto">
+                      <JsonBlock label="args" value={part.args} />
+                      {part.status === "done" && part.result !== undefined ? (
+                        <JsonBlock label="result" value={part.result} />
+                      ) : null}
+                    </div>
+                  </div>
+                ),
+              )}
               {chatMessage.status === "streaming" ? (
                 <span className="mt-2 block text-xs text-muted-foreground">
                   streaming…
@@ -64,18 +87,18 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
       </div>
 
       <form className="flex gap-2" onSubmit={submitMessage}>
-        <button
+        <Button
           type="button"
-          className="rounded border px-2 text-xs"
           onClick={toggleAutoScroll}
           aria-pressed={autoScroll}
         >
           {autoScroll ? "Auto" : "Manual"}
-        </button>
+        </Button>
         <Input
           name="message"
           placeholder="Type a message..."
           value={message}
+          disabled={isStreaming}
           onChange={(event) => setMessage(event.target.value)}
         />
         <Button type="submit" disabled={isStreaming}>
@@ -88,4 +111,33 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
       </form>
     </section>
   );
+}
+
+function getTextPartText(tokens: { seq: number; text: string }[]) {
+  return [...tokens]
+    .sort((left, right) => left.seq - right.seq)
+    .map((token) => token.text)
+    .join("");
+}
+
+function JsonBlock({ label, value }: { label: string; value: JsonValue }) {
+  return (
+    <div>
+      <div className="mb-1 font-mono text-[11px] text-muted-foreground">
+        {label}
+      </div>
+      <JsonView
+        value={asObject(value)}
+        collapsed={1}
+        displayDataTypes={false}
+        enableClipboard={false}
+        style={{ fontSize: 12 }}
+      />
+    </div>
+  );
+}
+
+function asObject(value: JsonValue): object {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  return { value };
 }
