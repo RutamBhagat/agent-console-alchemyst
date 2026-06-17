@@ -2,10 +2,14 @@
 
 import { Button } from "@agent-console-alchemyst/ui/components/button";
 import { Input } from "@agent-console-alchemyst/ui/components/input";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
+
+import { useTraceStore } from "./trace-store";
+import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
 
 export default function Home() {
   const workerRef = useRef<Worker | null>(null);
+  const addTrace = useTraceStore((state) => state.addTrace);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -13,15 +17,22 @@ export default function Home() {
       type: "module",
     });
 
+    function handleWorkerMessage(event: MessageEvent<unknown>) {
+      if (!isTraceMessage(event.data)) return;
+      addTrace(event.data.direction, event.data.event);
+    }
+
+    worker.addEventListener("message", handleWorkerMessage);
     workerRef.current = worker;
 
     return () => {
+      worker.removeEventListener("message", handleWorkerMessage);
       worker.terminate();
       workerRef.current = null;
     };
-  }, []);
+  }, [addTrace]);
 
-  function submitMessage(event: FormEvent<HTMLFormElement>) {
+  function submitMessage(event: SubmitEvent) {
     event.preventDefault();
 
     const content = message.trim();
@@ -33,12 +44,9 @@ export default function Home() {
 
   return (
     <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
-      <section className="min-w-0 rounded-lg border p-4">
-        <h2 className="mb-3 text-sm font-medium">Trace</h2>
-      </section>
+      <TraceSidebar />
 
       <section className="flex min-w-0 flex-col rounded-lg border p-4">
-        <h2 className="mb-3 text-sm font-medium">Chat</h2>
         <form className="mt-auto flex gap-2" onSubmit={submitMessage}>
           <Input
             name="message"
@@ -50,9 +58,7 @@ export default function Home() {
         </form>
       </section>
 
-      <section className="min-w-0 rounded-lg border p-4">
-        <h2 className="mb-3 text-sm font-medium">Context</h2>
-      </section>
+      <section className="min-w-0 rounded-lg border p-4"></section>
     </main>
   );
 }

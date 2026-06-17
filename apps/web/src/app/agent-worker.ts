@@ -1,13 +1,15 @@
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+type JsonEvent = { [key: string]: JsonValue };
+type TraceDirection = "worker->server" | "server->worker";
+
 type WorkerIn = { type: "send"; content?: unknown };
-type ServerOut =
-  | { type: "USER_MESSAGE"; content: string }
-  | { type: "PONG"; echo: string };
-type PingIn = { type: "PING"; challenge?: unknown };
+type WorkerOut = { type: "trace"; direction: TraceDirection; event: JsonEvent };
 
 const WS_URL = "ws://localhost:4747/ws";
 const encode = JSON.stringify;
 let socket: WebSocket | null = null;
-const pending: ServerOut[] = [];
+const pending: JsonEvent[] = [];
 
 function connect() {
   if (socket?.readyState === WebSocket.OPEN) return;
@@ -24,7 +26,7 @@ function connect() {
 function flush() {
   while (pending.length > 0 && socket?.readyState === WebSocket.OPEN) {
     const next = pending.shift();
-    if (next) socket.send(encode(next));
+    if (next) sendOpenSocket(next);
   }
 }
 
@@ -32,9 +34,9 @@ function send(content: string) {
   sendToServer({ type: "USER_MESSAGE", content });
 }
 
-function sendToServer(message: ServerOut) {
+function sendToServer(message: JsonEvent) {
   if (socket?.readyState === WebSocket.OPEN) {
-    socket.send(encode(message));
+    sendOpenSocket(message);
     return;
   }
 
@@ -42,23 +44,36 @@ function sendToServer(message: ServerOut) {
   connect();
 }
 
+function sendOpenSocket(message: JsonEvent) {
+  socket?.send(encode(message));
+  emitTrace("worker->server", message);
+}
+
 function handleServerMessage(event: MessageEvent) {
   if (typeof event.data !== "string") return;
 
-  const message = parseServerMessage(event.data);
-  if (message?.type !== "PING") return;
+  const message = parseJsonObject(event.data);
+  if (!message) return;
 
-  const echo =
-    typeof message.challenge === "string" ? message.challenge : "";
+  emitTrace("server->worker", message);
+  if (message.type !== "PING") return;
+
+  const echo = typeof message.challenge === "string" ? message.challenge : "";
   sendToServer({ type: "PONG", echo });
 }
 
-function parseServerMessage(raw: string): PingIn | null {
+function parseJsonObject(raw: string): JsonEvent | null {
   try {
-    return JSON.parse(raw) as PingIn;
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as JsonEvent;
   } catch {
     return null;
   }
+}
+
+function emitTrace(direction: TraceDirection, event: JsonEvent) {
+  self.postMessage({ type: "trace", direction, event } satisfies WorkerOut);
 }
 
 self.addEventListener("message", (event: MessageEvent<WorkerIn>) => {
