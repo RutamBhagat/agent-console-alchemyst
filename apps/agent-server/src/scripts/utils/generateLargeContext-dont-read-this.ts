@@ -22,13 +22,7 @@ export function generateLargeContext(): Record<string, unknown> {
     "numeric(12,4)",
     "interval",
   ];
-  const constraintTypes = [
-    "NOT NULL",
-    "UNIQUE",
-    "CHECK",
-    "DEFAULT",
-    "REFERENCES",
-  ];
+
   const indexTypes = ["btree", "hash", "gin", "gist", "brin"];
 
   for (let i = 0; i < 64; i++) {
