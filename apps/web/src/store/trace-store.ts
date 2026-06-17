@@ -8,7 +8,7 @@ export type JsonValue =
 export type JsonEvent = { [key: string]: JsonValue };
 export type TraceDirection = "worker->server" | "server->worker";
 
-type TraceEntry = {
+export type TraceEntry = {
   id: number;
   direction: TraceDirection;
   event: JsonEvent;
