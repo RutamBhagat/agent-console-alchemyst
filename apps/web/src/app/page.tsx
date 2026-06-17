@@ -13,15 +13,24 @@ import {
 import { UserMessage } from "@/components/chat/user-message";
 import { ToolTurn } from "@/components/tools/tool-turn";
 import { useChatStore } from "@/stores/chat-store";
+import { useScrollStore } from "@/stores/scroll-store";
 import type { ServerMessage } from "@/worker/types/serverToClient";
 
 type WorkerPatch = { type: "statePatch"; chat?: ServerMessage };
 
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
+  const mainRef = useRef<HTMLElement>(null);
   const [message, setMessage] = useState("");
-  const { addUserMessage, addToken, addToolCall, addToolResult, endStream, chats } =
-    useChatStore();
+  const {
+    addUserMessage,
+    addToken,
+    addToolCall,
+    addToolResult,
+    endStream,
+    chats,
+  } = useChatStore();
+  const { mode, toggleMode } = useScrollStore();
 
   useEffect(() => {
     const worker = new Worker(
@@ -49,6 +58,14 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (mode !== "auto") return;
+    mainRef.current?.scrollTo({
+      top: mainRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [chats, mode]);
+
   function submitMessage(event: React.SubmitEvent) {
     event.preventDefault();
 
@@ -65,7 +82,10 @@ export default function Home() {
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
       <Sidebar side="left" collapsible="offcanvas"></Sidebar>
       <SidebarInset className="relative h-svh min-h-0 p-4">
-        <main className="mx-auto flex h-full w-[min(760px,100%)] flex-col gap-4 overflow-y-auto pb-24 pt-8">
+        <main
+          ref={mainRef}
+          className="mx-auto flex h-full w-[min(760px,100%)] flex-col gap-4 overflow-y-auto pb-24 pt-8"
+        >
           {chats.map((chat, index) =>
             "type" in chat ? (
               <UserMessage key={`user-${index}`} message={chat} />
@@ -86,6 +106,14 @@ export default function Home() {
           onSubmit={submitMessage}
           className="absolute bottom-6 left-1/2 flex w-[min(640px,calc(100%-2rem))] -translate-x-1/2 items-center gap-2"
         >
+          <Button
+            type="button"
+            onClick={toggleMode}
+            className="h-10 px-4"
+            aria-pressed={mode === "auto"}
+          >
+            {mode === "auto" ? "Auto" : "Manual"}
+          </Button>
           <Input
             value={message}
             onChange={(event) => setMessage(event.target.value)}
