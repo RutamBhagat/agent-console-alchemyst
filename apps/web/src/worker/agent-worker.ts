@@ -9,7 +9,10 @@ import type { ServerMessage } from "../../../agent-server/src/types";
 export let socket: WebSocket | undefined;
 const sequenceGate = createSequenceGate();
 const reconnect = createReconnectController();
+const maxReconnectDelayMs = 10_000;
 let lastPongedPingSeq = 0;
+let reconnectAttempt = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
 self.addEventListener("message", (event: MessageEvent<unknown>) => {
   const message = WorkerMessageSchema.parse(event.data);
@@ -20,6 +23,7 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
       return;
     case "disconnect":
       {
+        clearReconnectTimer();
         const currentSocket = socket;
         socket = undefined;
         currentSocket?.close();
@@ -47,8 +51,13 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
   }
 });
 
-function connect(url: string) {
+function connect(url: string, isRetry = false) {
   reconnect.connect(url);
+  self.postMessage({
+    type: "connectionStatus",
+    status: isRetry ? "reconnecting" : "connecting",
+    reconnectDelayMs: 0,
+  });
   const oldSocket = socket;
   socket = undefined;
   oldSocket?.close();
@@ -60,6 +69,8 @@ function connect(url: string) {
 }
 
 function handleSocketOpen() {
+  reconnectAttempt = 0;
+  self.postMessage({ type: "connectionStatus", status: "connected" });
   const content = reconnect.takeReconnectMessage();
   if (!content) return;
   sendUserMessage(content);
@@ -67,10 +78,24 @@ function handleSocketOpen() {
 
 function handleSocketClose(closedSocket: WebSocket | undefined) {
   if (closedSocket !== socket) return;
+  socket = undefined;
   const content = reconnect.socketClosed();
-  if (!content) return;
-  self.postMessage({ type: "retryUserMessage", content });
-  connect(reconnect.url);
+  if (content) self.postMessage({ type: "retryUserMessage", content });
+
+  const reconnectDelayMs = Math.min(
+    500 * 2 ** reconnectAttempt,
+    maxReconnectDelayMs,
+  );
+  reconnectAttempt += 1;
+  self.postMessage({
+    type: "connectionStatus",
+    status: "reconnecting",
+    reconnectDelayMs,
+  });
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined;
+    connect(reconnect.url, true);
+  }, reconnectDelayMs);
 }
 
 function sendUserMessage(content: string) {
@@ -161,6 +186,11 @@ function applyServerMessage(message: ServerMessage) {
     default:
       return;
   }
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = undefined;
 }
 
 export {};

@@ -18,7 +18,7 @@ import { TraceSidebar } from "@/components/trace/trace-sidebar";
 import { useChatStore } from "@/stores/chat-store";
 import { useContextStore } from "@/stores/context-store";
 import { useTraceStore, type TraceEvent } from "@/stores/trace-store";
-import { useUtilStore } from "@/stores/util-store";
+import { useUtilStore, type ConnectionStatus } from "@/stores/util-store";
 import type {
   ContextSnapshotMessage,
   ServerMessage,
@@ -35,7 +35,15 @@ type RetryUserMessage = {
   content: string;
 };
 
-type WorkerEvent = WorkerPatch | TraceEvent | RetryUserMessage;
+type WorkerEvent =
+  | WorkerPatch
+  | TraceEvent
+  | RetryUserMessage
+  | {
+      type: "connectionStatus";
+      status: ConnectionStatus;
+      reconnectDelayMs?: number;
+    };
 
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
@@ -58,7 +66,14 @@ export default function Home() {
     addTraceEvent,
     clearTraceEvents,
   } = useTraceStore();
-  const { fullscreen, mode, toggleMode } = useUtilStore();
+  const {
+    connectionStatus,
+    reconnectDelayMs,
+    fullscreen,
+    mode,
+    setConnectionStatus,
+    toggleMode,
+  } = useUtilStore();
 
   useEffect(() => {
     const worker = new Worker(
@@ -71,6 +86,10 @@ export default function Home() {
       }
       if (event.data.type === "retryUserMessage") {
         retryUserMessage({ type: "USER_MESSAGE", content: event.data.content });
+        return;
+      }
+      if (event.data.type === "connectionStatus") {
+        setConnectionStatus(event.data.status, event.data.reconnectDelayMs);
         return;
       }
 
@@ -105,6 +124,7 @@ export default function Home() {
     clearTraceEvents,
     endStream,
     retryUserMessage,
+    setConnectionStatus,
   ]);
 
   useEffect(() => {
@@ -133,6 +153,15 @@ export default function Home() {
       }
     >
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
+      {connectionStatus !== "connected" && (
+        <div className="fixed right-3 top-3 z-50 rounded-md border bg-background/90 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
+          {connectionStatus === "connecting"
+            ? "Connecting..."
+            : reconnectDelayMs
+              ? `Reconnecting in ${Math.ceil(reconnectDelayMs / 1000)}s...`
+              : "Reconnecting..."}
+        </div>
+      )}
       <Sidebar side="left" collapsible="offcanvas">
         <TraceSidebar events={traceEvents} />
       </Sidebar>
