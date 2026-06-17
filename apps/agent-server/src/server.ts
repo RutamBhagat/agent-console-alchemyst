@@ -192,8 +192,6 @@ export class AgentServer {
       return;
     }
 
-    console.log(msg);
-
     switch (msg.type) {
       case "USER_MESSAGE":
         this.logClient("USER_MESSAGE", { content: msg.content }, "ok");
