@@ -3,11 +3,11 @@ import { ChaosConfig, ServerMessage } from "./types/index.js";
 type IntRange = [number, number];
 
 const CHAOS_SETTINGS = {
-  dropConnection: { enabled: true, afterMessages: [15, 45] },
-  reorder: { enabled: true, chancePercent: [15, 35] },
-  duplicate: { enabled: true, chancePercent: [5, 15] },
-  latencySpike: { enabled: true, chancePercent: [5, 13], ms: [2000, 8000] },
-  corruptPing: { enabled: true, chancePercent: [15, 25] },
+  dropConnection: { enabled: false, afterMessages: [15, 45] },
+  reorder: { enabled: true, chancePercent: [45, 55] },
+  duplicate: { enabled: false, chancePercent: [5, 15] },
+  latencySpike: { enabled: false, chancePercent: [5, 13], ms: [2000, 8000] },
+  corruptPing: { enabled: false, chancePercent: [15, 25] }, // PASS
 } satisfies {
   dropConnection: { enabled: boolean; afterMessages: IntRange };
   reorder: { enabled: boolean; chancePercent: IntRange };

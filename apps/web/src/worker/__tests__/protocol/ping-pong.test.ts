@@ -38,6 +38,22 @@ test("pongs every ping challenge", async () => {
   ]);
 });
 
+test("does not pong duplicate or replayed pings", async () => {
+  await import("../../agent-worker");
+
+  workerScope.uiMessage({ type: "connect", url: "ws://test/ws" });
+  FakeWebSocket.latest?.serverMessage(
+    JSON.stringify({ type: "PING", seq: 1, challenge: "first" }),
+  );
+  FakeWebSocket.latest?.serverMessage(
+    JSON.stringify({ type: "PING", seq: 1, challenge: "first" }),
+  );
+
+  expect(FakeWebSocket.latest?.sent).toEqual([
+    JSON.stringify({ type: "PONG", echo: "first" }),
+  ]);
+});
+
 test("reports corrupt server messages without sending pong", async () => {
   await import("../../agent-worker");
 

@@ -2,9 +2,17 @@
 
 import JsonView from "@uiw/react-json-view";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@agent-console-alchemyst/ui/components/accordion";
+import { cn } from "@agent-console-alchemyst/ui/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
 import type { StoredTraceEvent } from "@/stores/trace-store";
+import { useUtilStore } from "@/stores/util-store";
 
 interface TraceSidebarProps {
   events: StoredTraceEvent[];
@@ -12,6 +20,7 @@ interface TraceSidebarProps {
 
 export function TraceSidebar({ events }: TraceSidebarProps) {
   const streams = useChatStore((state) => state.streams);
+  const mode = useUtilStore((state) => state.mode);
   const parentRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(() => new Set());
@@ -39,6 +48,15 @@ export function TraceSidebar({ events }: TraceSidebarProps) {
     overscan: 6,
   });
 
+  useEffect(() => {
+    if (mode !== "auto") return;
+
+    parentRef.current?.scrollTo({
+      top: parentRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [events, mode]);
+
   return (
     <aside className="flex h-full min-h-0 flex-col border-r bg-background">
       <div className="border-b py-2 px-3 pr-2">
@@ -61,6 +79,12 @@ export function TraceSidebar({ events }: TraceSidebarProps) {
         >
           {rowVirtualizer.getVirtualItems().map((virtualItem) => {
             const event = visibleEvents[virtualItem.index];
+            const accordionValue =
+              "seq" in event.message
+                ? `${event.direction}-${event.message.type}-${event.message.seq}`
+                : "firstSeq" in event.message
+                  ? `${event.direction}-${event.message.type}-${event.message.firstSeq}`
+                  : `${event.direction}-${event.message.type}-${virtualItem.index}`;
 
             return (
               <article
@@ -70,39 +94,56 @@ export function TraceSidebar({ events }: TraceSidebarProps) {
                 className="absolute left-0 top-0 w-full pb-2"
                 style={{ transform: `translateY(${virtualItem.start}px)` }}
               >
-                <div className="rounded-md border p-2">
-                  <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                    <span className="font-medium">
-                      {event.direction === "in"
-                        ? "server -> worker"
-                        : "worker -> server"}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {event.message.type}
-                    </span>
-                  </div>
-                  <JsonView
-                    value={
-                      event.direction === "in" && event.message.type === "TOKEN"
-                        ? {
-                            ...event.message,
-                            text: streams[event.message.stream_id]?.text ?? "",
-                          }
-                        : event.message
-                    }
-                    collapsed={1}
-                    displayDataTypes={false}
-                    displayObjectSize={false}
-                    enableClipboard={false}
-                    shortenTextAfterLength={80}
-                    style={
-                      {
-                        fontSize: 12,
-                        "--w-rjv-background-color": "transparent",
-                      } as CSSProperties
-                    }
-                  />
-                </div>
+                <Accordion
+                  key={accordionValue}
+                  type="single"
+                  collapsible
+                  defaultValue={
+                    event.message.type === "TOKEN" ? undefined : accordionValue
+                  }
+                  className={cn(
+                    "rounded-md border px-2",
+                    event.message.type === "STREAM_END" && "bg-green-100",
+                  )}
+                >
+                  <AccordionItem value={accordionValue} className="border-0">
+                    <AccordionTrigger className="py-2 text-xs hover:no-underline">
+                      <span className="font-medium">
+                        {event.direction === "in"
+                          ? "server -> worker"
+                          : "worker -> server"}
+                      </span>
+                      <span className="ml-auto mr-2 text-muted-foreground">
+                        {event.message.type}
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-2">
+                      <JsonView
+                        value={
+                          event.direction === "in" &&
+                          event.message.type === "TOKEN"
+                            ? {
+                                ...event.message,
+                                text:
+                                  streams[event.message.stream_id]?.text ?? "",
+                              }
+                            : event.message
+                        }
+                        collapsed={1}
+                        displayDataTypes={false}
+                        displayObjectSize={false}
+                        enableClipboard={false}
+                        shortenTextAfterLength={80}
+                        style={
+                          {
+                            fontSize: 12,
+                            "--w-rjv-background-color": "transparent",
+                          } as CSSProperties
+                        }
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </article>
             );
           })}
