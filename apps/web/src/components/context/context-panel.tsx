@@ -1,10 +1,9 @@
 import JsonView from "@uiw/react-json-view";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { VirtualDiffViewer } from "virtual-react-json-diff";
 
 import { useContextStore } from "@/store/context-store";
 import type { JsonValue } from "@/store/trace-store";
-import { Input } from "@agent-console-alchemyst/ui/components/input";
 import {
   SidebarContent,
   SidebarFooter,
@@ -19,34 +18,22 @@ export function ContextPanel() {
   );
   const contextIds = Object.keys(contexts).sort();
   const snapshots = activeContextId ? (contexts[activeContextId] ?? []) : [];
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const visibleSnapshots = useMemo(
-    () =>
-      deferredSearch
-        ? snapshots.filter((snapshot) =>
-            JSON.stringify(snapshot.data).toLowerCase().includes(deferredSearch),
-          )
-        : snapshots,
-    [deferredSearch, snapshots],
-  );
   const [index, setIndex] = useState(0);
 
-  const safeIndex = Math.min(index, Math.max(visibleSnapshots.length - 1, 0));
-  const current = visibleSnapshots[safeIndex];
-  const sourceIndex = current ? snapshots.findIndex((item) => item === current) : -1;
-  const previous = sourceIndex > 0 ? snapshots[sourceIndex - 1] : undefined;
+  const safeIndex = Math.min(index, Math.max(snapshots.length - 1, 0));
+  const current = snapshots[safeIndex];
+  const previous = snapshots[safeIndex - 1];
 
   useEffect(() => {
-    setIndex(Math.max(visibleSnapshots.length - 1, 0));
-  }, [activeContextId, visibleSnapshots.length]);
+    setIndex(Math.max(snapshots.length - 1, 0));
+  }, [activeContextId, snapshots.length]);
 
   function goPrevious() {
     setIndex((value) => Math.max(value - 1, 0));
   }
 
   function goNext() {
-    setIndex((value) => Math.min(value + 1, visibleSnapshots.length - 1));
+    setIndex((value) => Math.min(value + 1, snapshots.length - 1));
   }
 
   return (
@@ -55,15 +42,9 @@ export function ContextPanel() {
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">Context</h2>
           <span className="font-mono text-xs text-muted-foreground">
-            {visibleSnapshots.length}/{snapshots.length}
+            {snapshots.length}
           </span>
         </div>
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search context"
-          className="h-8"
-        />
       </SidebarHeader>
 
       {contextIds.length > 0 ? (
@@ -85,13 +66,9 @@ export function ContextPanel() {
         </div>
       ) : null}
 
-      {visibleSnapshots.length === 0 || !current ? (
+      {snapshots.length === 0 || !current ? (
         <SidebarContent className="px-4">
-          <p className="text-sm text-muted-foreground">
-            {snapshots.length === 0
-              ? "No context snapshots yet."
-              : "No matching snapshots."}
-          </p>
+          <p className="text-sm text-muted-foreground">No context snapshots yet.</p>
         </SidebarContent>
       ) : (
         <SidebarContent className="px-2 pb-2">
@@ -116,7 +93,7 @@ export function ContextPanel() {
         </SidebarContent>
       )}
 
-      {visibleSnapshots.length > 1 ? (
+      {snapshots.length > 1 ? (
         <SidebarFooter className="flex-row items-center justify-center gap-3 text-sm">
           <button
             type="button"
@@ -127,12 +104,12 @@ export function ContextPanel() {
             &lt;
           </button>
           <span className="font-mono">
-            {safeIndex + 1}/{visibleSnapshots.length}
+            {safeIndex + 1}/{snapshots.length}
           </span>
           <button
             type="button"
             className="rounded border px-2 py-1 disabled:opacity-40"
-            disabled={safeIndex === visibleSnapshots.length - 1}
+            disabled={safeIndex === snapshots.length - 1}
             onClick={goNext}
           >
             &gt;
