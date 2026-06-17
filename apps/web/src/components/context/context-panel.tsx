@@ -2,8 +2,8 @@ import JsonView from "@uiw/react-json-view";
 import { useEffect, useState } from "react";
 import { VirtualDiffViewer } from "virtual-react-json-diff";
 
-import { useContextStore } from "@/app/context-store";
-import type { JsonValue } from "@/app/trace-store";
+import { useContextStore } from "@/store/context-store";
+import type { JsonValue } from "@/store/trace-store";
 
 export function ContextPanel() {
   const contexts = useContextStore((state) => state.contexts);

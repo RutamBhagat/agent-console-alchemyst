@@ -1,5 +1,4 @@
 import { create } from "zustand";
-
 import type { JsonEvent, TraceDirection } from "./trace-store";
 
 type UserChatMessage = {
@@ -87,7 +86,8 @@ function applyToken(
 
   const current = messages[index];
   if (!current || current.role !== "agent") return { messages };
-  if (current.tokens.some((token) => token.seq === event.seq)) return { messages };
+  if (current.tokens.some((token) => token.seq === event.seq))
+    return { messages };
 
   const nextMessage: AgentChatMessage = {
     ...current,

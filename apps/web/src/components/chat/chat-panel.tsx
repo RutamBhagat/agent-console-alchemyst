@@ -2,7 +2,8 @@ import { Button } from "@agent-console-alchemyst/ui/components/button";
 import { Input } from "@agent-console-alchemyst/ui/components/input";
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 
-import { getAgentText, useChatStore } from "@/app/chat-store";
+import { getAgentText, useChatStore } from "@/store/chat-store";
+import { useUiStore } from "@/store/ui-store";
 
 type ChatPanelProps = {
   onSubmitMessage: (content: string) => void;
@@ -10,6 +11,8 @@ type ChatPanelProps = {
 
 export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
   const messages = useChatStore((state) => state.messages);
+  const autoScroll = useUiStore((state) => state.autoScroll);
+  const toggleAutoScroll = useUiStore((state) => state.toggleAutoScroll);
   const isStreaming = messages.some(
     (chatMessage) =>
       chatMessage.role === "agent" && chatMessage.status === "streaming",
@@ -18,8 +21,9 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (!autoScroll) return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
+  }, [autoScroll, messages]);
 
   function submitMessage(event: SubmitEvent) {
     event.preventDefault();
@@ -60,6 +64,14 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
       </div>
 
       <form className="flex gap-2" onSubmit={submitMessage}>
+        <button
+          type="button"
+          className="rounded border px-2 text-xs"
+          onClick={toggleAutoScroll}
+          aria-pressed={autoScroll}
+        >
+          {autoScroll ? "Auto" : "Manual"}
+        </button>
         <Input
           name="message"
           placeholder="Type a message..."

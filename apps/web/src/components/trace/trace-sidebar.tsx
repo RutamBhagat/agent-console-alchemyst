@@ -6,7 +6,8 @@ import {
   type JsonEvent,
   type TraceDirection,
   useTraceStore,
-} from "@/app/trace-store";
+} from "@/store/trace-store";
+import { useUiStore } from "@/store/ui-store";
 
 type WorkerTraceMessage = {
   type: "trace";
@@ -16,6 +17,7 @@ type WorkerTraceMessage = {
 
 export function TraceSidebar() {
   const traces = useTraceStore((state) => state.traces);
+  const autoScroll = useUiStore((state) => state.autoScroll);
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: traces.length,
@@ -25,9 +27,9 @@ export function TraceSidebar() {
   });
 
   useEffect(() => {
-    if (traces.length === 0) return;
+    if (!autoScroll || traces.length === 0) return;
     rowVirtualizer.scrollToIndex(traces.length - 1, { align: "end" });
-  }, [rowVirtualizer, traces.length]);
+  }, [autoScroll, rowVirtualizer, traces.length]);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-col rounded-lg">

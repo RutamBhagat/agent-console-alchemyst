@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
-import { useChatStore } from "./chat-store";
-import { useContextStore } from "./context-store";
-import { useTraceStore } from "./trace-store";
+import { useChatStore } from "../store/chat-store";
+import { useContextStore } from "../store/context-store";
+import { useTraceStore } from "../store/trace-store";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
@@ -13,12 +13,17 @@ export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const addTrace = useTraceStore((state) => state.addTrace);
   const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
-  const applyContextTraceEvent = useContextStore((state) => state.applyTraceEvent);
+  const applyContextTraceEvent = useContextStore(
+    (state) => state.applyTraceEvent,
+  );
 
   useEffect(() => {
-    const worker = new Worker(new URL("./agent-worker.ts", import.meta.url), {
-      type: "module",
-    });
+    const worker = new Worker(
+      new URL("../worker/agent-worker.ts", import.meta.url),
+      {
+        type: "module",
+      },
+    );
 
     function handleWorkerMessage(event: MessageEvent<unknown>) {
       if (!isTraceMessage(event.data)) return;

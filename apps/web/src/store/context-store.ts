@@ -40,13 +40,17 @@ function applyContextTraceEvent(
     activeContextId: state.activeContextId ?? event.context_id,
     contexts: {
       ...state.contexts,
-      [event.context_id]: [...current, { seq: event.seq, data: event.data }].sort(
-        (left, right) => left.seq - right.seq,
-      ),
+      [event.context_id]: [
+        ...current,
+        { seq: event.seq, data: event.data },
+      ].sort((left, right) => left.seq - right.seq),
     },
   };
 }
 
 function isJsonLike(value: unknown): value is JsonValue {
-  return value === null || ["string", "number", "boolean", "object"].includes(typeof value);
+  return (
+    value === null ||
+    ["string", "number", "boolean", "object"].includes(typeof value)
+  );
 }
