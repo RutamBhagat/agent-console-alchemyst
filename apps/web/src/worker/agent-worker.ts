@@ -1,4 +1,4 @@
-import { ResumeController } from "./resume-controller";
+import { createReconnectController } from "./reconnect-controller";
 import { SequenceGate, type JsonEvent } from "./sequence-gate";
 
 type TraceDirection = "worker->server" | "server->worker";
@@ -6,24 +6,40 @@ type TraceDirection = "worker->server" | "server->worker";
 type WorkerIn =
   | { type: "send"; content?: unknown }
   | { type: "processed"; seq?: unknown };
-type WorkerOut = { type: "trace"; direction: TraceDirection; event: JsonEvent };
+type WorkerOut =
+  | { type: "trace"; direction: TraceDirection; event: JsonEvent }
+  | { type: "flush-last-turn" };
 
 const WS_URL = "ws://localhost:4747/ws";
 const sequenceGate = new SequenceGate();
-const resumeController = new ResumeController({
+let lastUserMessage: string | null = null;
+const reconnectController = createReconnectController({
   url: WS_URL,
-  getLastProcessedSeq: () => sequenceGate.getLastProcessedSeq(),
   onMessage: handleServerMessage,
-  onSend: (message) => emitTrace("worker->server", message),
+  onReconnect: retryLastUserMessage,
+  onSend: handleClientMessageSent,
 });
 
 function send(content: string) {
-  sequenceGate.noteUserMessageSent();
-  resumeController.send({ type: "USER_MESSAGE", content });
+  lastUserMessage = content;
+  reconnectController.send({ type: "USER_MESSAGE", content });
 }
 
 function sendToServer(message: JsonEvent) {
-  resumeController.send(message);
+  reconnectController.send(message);
+}
+
+function retryLastUserMessage() {
+  if (!lastUserMessage) return;
+
+  sequenceGate.noteUserMessageSent();
+  globalThis.postMessage({ type: "flush-last-turn" } satisfies WorkerOut);
+  reconnectController.send({ type: "USER_MESSAGE", content: lastUserMessage });
+}
+
+function handleClientMessageSent(message: JsonEvent) {
+  if (message.type === "USER_MESSAGE") sequenceGate.noteUserMessageSent();
+  emitTrace("worker->server", message);
 }
 
 function handleServerMessage(raw: string) {
@@ -87,5 +103,5 @@ self.addEventListener("message", (event: MessageEvent<WorkerIn>) => {
   if (content) send(content);
 });
 
-resumeController.connect();
+reconnectController.connect();
 export {};

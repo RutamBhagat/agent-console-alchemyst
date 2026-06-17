@@ -40,7 +40,10 @@ export class AgentServer {
   private pongTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   // ── Tool ACK tracking ─────────────────────────────────────
-  private pendingAcks: Map<string, { resolve: () => void; timeout: ReturnType<typeof setTimeout> }> = new Map();
+  private pendingAcks: Map<
+    string,
+    { resolve: () => void; timeout: ReturnType<typeof setTimeout> }
+  > = new Map();
 
   // ── Streaming state ───────────────────────────────────────
   private isStreaming: boolean = false;
@@ -74,7 +77,10 @@ export class AgentServer {
   // HTTP handler
   // ─────────────────────────────────────────────────────────
 
-  private handleHttp(req: http.IncomingMessage, res: http.ServerResponse): void {
+  private handleHttp(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+  ): void {
     // CORS headers for local dev
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -88,13 +94,17 @@ export class AgentServer {
 
     if (req.url === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        status: "ok",
-        mode: this.mode,
-        connected: this.activeWs !== null && this.activeWs.readyState === WebSocket.OPEN,
-        seq: this.seq,
-        historyLength: this.eventHistory.length,
-      }));
+      res.end(
+        JSON.stringify({
+          status: "ok",
+          mode: this.mode,
+          connected:
+            this.activeWs !== null &&
+            this.activeWs.readyState === WebSocket.OPEN,
+          seq: this.seq,
+          historyLength: this.eventHistory.length,
+        }),
+      );
       return;
     }
 
@@ -137,12 +147,17 @@ export class AgentServer {
     if (this.mode === "chaos") {
       this.chaosConfig = generateChaosConfig();
       this.chaosEngine = new ChaosEngine(this.chaosConfig);
-      console.log("[agent-server] Chaos config:", JSON.stringify(this.chaosConfig));
+      console.log(
+        "[agent-server] Chaos config:",
+        JSON.stringify(this.chaosConfig),
+      );
     }
 
     ws.on("message", (data) => this.handleMessage(ws, data));
     ws.on("close", (code, reason) => {
-      console.log(`[agent-server] Connection closed: ${code} ${reason.toString()}`);
+      console.log(
+        `[agent-server] Connection closed: ${code} ${reason.toString()}`,
+      );
       if (this.activeWs === ws) {
         this.stopHeartbeat();
         this.activeWs = null;
@@ -169,9 +184,15 @@ export class AgentServer {
     try {
       msg = JSON.parse(raw.toString()) as ClientMessage;
     } catch {
-      this.logClient("PARSE_ERROR", { raw: raw.toString().slice(0, 200) }, "error");
+      this.logClient(
+        "PARSE_ERROR",
+        { raw: raw.toString().slice(0, 200) },
+        "error",
+      );
       return;
     }
+
+    console.log(msg);
 
     switch (msg.type) {
       case "USER_MESSAGE":
@@ -215,7 +236,9 @@ export class AgentServer {
     }
 
     const script = selectScript(content);
-    console.log(`[agent-server] Selected script: ${script.name} (${script.id})`);
+    console.log(
+      `[agent-server] Selected script: ${script.name} (${script.id})`,
+    );
 
     this.runScript(ws, script).catch((err) => {
       if (err.name !== "AbortError") {
@@ -229,7 +252,9 @@ export class AgentServer {
   // ─────────────────────────────────────────────────────────
 
   private handleResume(ws: WebSocket, lastSeq: number): void {
-    console.log(`[agent-server] Resume from seq=${lastSeq}, history has ${this.eventHistory.length} events`);
+    console.log(
+      `[agent-server] Resume from seq=${lastSeq}, history has ${this.eventHistory.length} events`,
+    );
 
     const toReplay = this.eventHistory.filter((m) => m.seq > lastSeq);
     console.log(`[agent-server] Replaying ${toReplay.length} events`);
@@ -262,11 +287,15 @@ export class AgentServer {
       this.logClient("PONG", { echo, latency_ms: latency }, "ok");
       this.missedPongs = 0;
     } else {
-      this.logClient("PONG", {
-        echo,
-        expected: this.pendingPing.challenge,
-        latency_ms: latency,
-      }, "wrong_challenge");
+      this.logClient(
+        "PONG",
+        {
+          echo,
+          expected: this.pendingPing.challenge,
+          latency_ms: latency,
+        },
+        "wrong_challenge",
+      );
     }
 
     this.pendingPing = null;
@@ -296,7 +325,10 @@ export class AgentServer {
   // Script execution engine
   // ─────────────────────────────────────────────────────────
 
-  private async runScript(ws: WebSocket, script: typeof import("./scripts.js").RESPONSE_SCRIPTS[number]): Promise<void> {
+  private async runScript(
+    ws: WebSocket,
+    script: (typeof import("./scripts.js").RESPONSE_SCRIPTS)[number],
+  ): Promise<void> {
     const streamId = `s_${randomUUID().slice(0, 8)}`;
     const abort = new AbortController();
     this.streamAbortController = abort;
@@ -400,7 +432,10 @@ export class AgentServer {
   // Message sending (with chaos if enabled)
   // ─────────────────────────────────────────────────────────
 
-  private async sendMessage(ws: WebSocket, message: ServerMessage): Promise<void> {
+  private async sendMessage(
+    ws: WebSocket,
+    message: ServerMessage,
+  ): Promise<void> {
     if (ws.readyState !== WebSocket.OPEN) return;
 
     // Record in history (always the original, unchaoticised version)
@@ -452,14 +487,22 @@ export class AgentServer {
       // Check if previous ping was answered
       if (this.pendingPing) {
         this.missedPongs++;
-        this.logClient("PONG_TIMEOUT", {
-          challenge: this.pendingPing.challenge,
-          missed_count: this.missedPongs,
-        }, "violation");
+        this.logClient(
+          "PONG_TIMEOUT",
+          {
+            challenge: this.pendingPing.challenge,
+            missed_count: this.missedPongs,
+          },
+          "violation",
+        );
 
         if (this.missedPongs >= 3) {
           console.log("[agent-server] 3 missed PONGs — terminating connection");
-          this.logClient("CONNECTION_TERMINATED", { reason: "missed_pongs" }, "violation");
+          this.logClient(
+            "CONNECTION_TERMINATED",
+            { reason: "missed_pongs" },
+            "violation",
+          );
           ws.terminate();
           this.stopHeartbeat();
           return;
@@ -581,7 +624,11 @@ export class AgentServer {
     console.log("[agent-server] Session reset");
   }
 
-  private logClient(type: string, data: Record<string, unknown>, verdict: string): void {
+  private logClient(
+    type: string,
+    data: Record<string, unknown>,
+    verdict: string,
+  ): void {
     this.clientLog.push({
       timestamp: Date.now(),
       type,

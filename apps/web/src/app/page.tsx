@@ -9,10 +9,18 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ContextPanel } from "@/components/context/context-panel";
 import { isTraceMessage, TraceSidebar } from "@/components/trace/trace-sidebar";
 
+type WorkerFlushMessage = { type: "flush-last-turn" };
+
+function isFlushMessage(value: unknown): value is WorkerFlushMessage {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as Partial<WorkerFlushMessage>).type === "flush-last-turn";
+}
+
 export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const addTrace = useTraceStore((state) => state.addTrace);
   const applyChatTraceEvent = useChatStore((state) => state.applyTraceEvent);
+  const flushLastTurn = useChatStore((state) => state.flushLastTurn);
   const applyContextTraceEvent = useContextStore(
     (state) => state.applyTraceEvent,
   );
@@ -26,6 +34,11 @@ export default function Home() {
     );
 
     function handleWorkerMessage(event: MessageEvent<unknown>) {
+      if (isFlushMessage(event.data)) {
+        flushLastTurn();
+        return;
+      }
+
       if (!isTraceMessage(event.data)) return;
 
       const { direction, event: traceEvent } = event.data;

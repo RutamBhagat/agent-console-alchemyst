@@ -38,11 +38,14 @@ export type ChatMessage = UserChatMessage | AgentChatMessage;
 
 type ChatState = {
   messages: ChatMessage[];
+  flushLastTurn: () => void;
   applyTraceEvent: (direction: TraceDirection, event: JsonEvent) => void;
 };
 
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
+  flushLastTurn: () =>
+    set((state) => ({ messages: flushLastTurn(state.messages) })),
   applyTraceEvent: (direction, event) =>
     set((state) => applyChatTraceEvent(state, direction, event)),
 }));
@@ -52,6 +55,10 @@ export function applyChatTraceEvent(
   direction: TraceDirection,
   event: JsonEvent,
 ): Pick<ChatState, "messages"> {
+  if (direction === "worker->server" && event.type === "FLUSH_LAST_TURN") {
+    return { messages: flushLastTurn(state.messages) };
+  }
+
   if (direction === "worker->server" && event.type === "USER_MESSAGE") {
     if (typeof event.content !== "string") return { messages: state.messages };
 
@@ -210,6 +217,19 @@ function applyStreamEnd(
         : message,
     ),
   };
+}
+
+function flushLastTurn(messages: ChatMessage[]) {
+  let lastUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      lastUserIndex = index;
+      break;
+    }
+  }
+
+  if (lastUserIndex === -1) return messages;
+  return messages.slice(0, lastUserIndex);
 }
 
 function getOrCreateStream(messages: ChatMessage[], streamId: string) {

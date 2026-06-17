@@ -22,6 +22,10 @@ export class SequenceGate {
     return this.lastProcessedSeq;
   }
 
+  getResumeSeq() {
+    return this.mayStartNewTurn ? 0 : this.lastProcessedSeq;
+  }
+
   noteUserMessageSent() {
     this.mayStartNewTurn = true;
     this.restartBuffer.clear();
