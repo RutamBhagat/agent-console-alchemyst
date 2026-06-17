@@ -9,29 +9,29 @@
     "start": "next start"
   },
   "dependencies": {
-    "@agent-console-alchemyst/env": "workspace:*",
-    "@agent-console-alchemyst/ui": "workspace:*",
+    "@agent-console-alchemyst/env": "file:../../packages/env",
+    "@agent-console-alchemyst/ui": "file:../../packages/ui",
     "@tanstack/react-virtual": "^3.14.2",
     "@uiw/react-json-view": "^2.0.0-alpha.43",
     "babel-plugin-react-compiler": "^1.0.0",
-    "dotenv": "catalog:",
-    "lucide-react": "catalog:",
+    "dotenv": "^17.2.2",
+    "lucide-react": "^0.546.0",
     "next": "^16.2.0",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "sonner": "catalog:",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sonner": "^2.0.5",
     "virtual-react-json-diff": "^1.0.16",
-    "zod": "catalog:",
+    "zod": "^4.1.13",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@agent-console-alchemyst/config": "workspace:*",
+    "@agent-console-alchemyst/config": "file:../../packages/config",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.9.3",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "tailwindcss": "catalog:",
-    "typescript": "catalog:",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^6",
     "vitest": "^4.0.15"
   }
 }

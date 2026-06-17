@@ -69,16 +69,15 @@ stateDiagram-v2
 
 ## Prerequisites
 
-- Bun 1.3+
+- Node.js 20+
 - Docker, for the provided backend container
-- Node.js 20+, if you inspect or run the backend outside Docker
 
 ## Run Locally
 
 Install dependencies:
 
 ```bash
-bun install
+npm i
 ```
 
 Build and run the provided agent server in normal mode:
@@ -91,7 +90,7 @@ docker run -p 4747:4747 agent-server
 In another terminal, start the web app:
 
 ```bash
-bun run dev:web
+npm run build && npm run start
 ```
 
 Open:
@@ -155,10 +154,10 @@ assignment/       Original assignment docs and failure-mode notes
 
 | Command | Description |
 | --- | --- |
-| `bun run dev:web` | Start the Next.js app on port 3001 |
-| `bun run build` | Build workspace packages/apps |
-| `bun run start` | Start the built web app |
-| `bun run test` | Run the web app Vitest suite |
+| `npm run dev:web` | Start the Next.js app on port 3001 |
+| `npm run build` | Build workspace packages/apps |
+| `npm run start` | Start the built web app |
+| `npm run test` | Run the web app Vitest suite |
 
 ## Submission Notes
 

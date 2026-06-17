@@ -3,8 +3,8 @@ import { prettifyError, ZodError } from "zod";
 import { ServerMessageSchema, WorkerMessageSchema } from "./schemas/protocol";
 import { createReconnectController } from "./reconnect-controller";
 import { createSequenceGate } from "./sequence-gate";
-import type { ClientMessage } from "./types/clientToServer";
-import type { ServerMessage } from "./types/serverToClient";
+import type { ClientMessage } from "../../../agent-server/src/types";
+import type { ServerMessage } from "../../../agent-server/src/types";
 
 export let socket: WebSocket | undefined;
 const sequenceGate = createSequenceGate();
@@ -30,10 +30,17 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
       return;
     }
     case "toolAck": {
-      const ack = { type: "TOOL_ACK", call_id: message.call_id } satisfies ClientMessage;
+      const ack = {
+        type: "TOOL_ACK",
+        call_id: message.call_id,
+      } satisfies ClientMessage;
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(ack));
-        self.postMessage({ type: "clientEvent", direction: "out", message: ack });
+        self.postMessage({
+          type: "clientEvent",
+          direction: "out",
+          message: ack,
+        });
       }
       return;
     }
@@ -73,7 +80,11 @@ function sendUserMessage(content: string) {
   sequenceGate.reset();
   lastPongedPingSeq = 0;
   socket.send(JSON.stringify(userMessage));
-  self.postMessage({ type: "clientEvent", direction: "out", message: userMessage });
+  self.postMessage({
+    type: "clientEvent",
+    direction: "out",
+    message: userMessage,
+  });
 }
 
 function handleSocketMessage(event: MessageEvent) {
@@ -84,9 +95,16 @@ function handleSocketMessage(event: MessageEvent) {
 
     if (message.type === "PING" && message.seq > lastPongedPingSeq) {
       lastPongedPingSeq = message.seq;
-      const pong = { type: "PONG", echo: message.challenge } satisfies ClientMessage;
+      const pong = {
+        type: "PONG",
+        echo: message.challenge,
+      } satisfies ClientMessage;
       socket?.send(JSON.stringify(pong));
-      self.postMessage({ type: "clientEvent", direction: "out", message: pong });
+      self.postMessage({
+        type: "clientEvent",
+        direction: "out",
+        message: pong,
+      });
     }
 
     for (const readyMessage of sequenceGate.accept(message)) {
@@ -99,14 +117,24 @@ function handleSocketMessage(event: MessageEvent) {
       sequenceGate.lastAppliedSeq === lastAppliedBefore &&
       socket?.readyState === WebSocket.OPEN
     ) {
-      const resume = { type: "RESUME", last_seq: lastAppliedBefore } satisfies ClientMessage;
+      const resume = {
+        type: "RESUME",
+        last_seq: lastAppliedBefore,
+      } satisfies ClientMessage;
       socket.send(JSON.stringify(resume));
-      self.postMessage({ type: "clientEvent", direction: "out", message: resume });
+      self.postMessage({
+        type: "clientEvent",
+        direction: "out",
+        message: resume,
+      });
     }
   } catch (error) {
     self.postMessage({
       type: "protocolViolation",
-      error: error instanceof ZodError ? prettifyError(error) : "Invalid WebSocket frame",
+      error:
+        error instanceof ZodError
+          ? prettifyError(error)
+          : "Invalid WebSocket frame",
     });
   }
 }

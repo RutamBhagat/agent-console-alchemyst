@@ -1,4 +1,4 @@
-import type { ServerMessage } from "./types/serverToClient";
+import type { ServerMessage } from "../../../agent-server/src/types";
 
 export function createSequenceGate() {
   let nextExpectedSeq = 1;
