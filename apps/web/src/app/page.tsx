@@ -1,30 +1,26 @@
 "use client";
 
-const TITLE_TEXT = `
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
+import { Button } from "@agent-console-alchemyst/ui/components/button";
+import { Input } from "@agent-console-alchemyst/ui/components/input";
 
 export default function Home() {
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-2">
-      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
-      <div className="grid gap-6">
-        <section className="rounded-lg border p-4">
-          <h2 className="mb-2 font-medium">API Status</h2>
-        </section>
-      </div>
-    </div>
+    <main className="grid h-full min-h-0 grid-cols-3 gap-4 p-4">
+      <section className="min-w-0 rounded-lg border p-4">
+        <h2 className="mb-3 text-sm font-medium">Trace</h2>
+      </section>
+
+      <section className="flex min-w-0 flex-col rounded-lg border p-4">
+        <h2 className="mb-3 text-sm font-medium">Chat</h2>
+        <form className="mt-auto flex gap-2">
+          <Input name="message" placeholder="Type a message..." />
+          <Button type="submit">Submit</Button>
+        </form>
+      </section>
+
+      <section className="min-w-0 rounded-lg border p-4">
+        <h2 className="mb-3 text-sm font-medium">Context</h2>
+      </section>
+    </main>
   );
 }
