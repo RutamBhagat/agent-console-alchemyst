@@ -1,3 +1,9 @@
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@agent-console-alchemyst/ui/components/accordion";
 import { Button } from "@agent-console-alchemyst/ui/components/button";
 import { Input } from "@agent-console-alchemyst/ui/components/input";
 import JsonView from "@uiw/react-json-view";
@@ -59,20 +65,25 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
                     {getTextPartText(part.tokens)}
                   </p>
                 ) : (
-                  <div key={part.callId} className="rounded-md border p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2 text-xs">
-                      <span className="font-mono">{part.toolName}</span>
-                      <span className="text-muted-foreground">
-                        {part.status}
-                      </span>
-                    </div>
-                    <div className="space-y-2 overflow-x-auto">
-                      <JsonBlock label="args" value={part.args} />
-                      {part.status === "done" && part.result !== undefined ? (
-                        <JsonBlock label="result" value={part.result} />
-                      ) : null}
-                    </div>
-                  </div>
+                  <Accordion
+                    key={part.callId}
+                    type="single"
+                    collapsible
+                    defaultValue={part.callId}
+                    className="rounded-md border px-3"
+                  >
+                    <AccordionItem value={part.callId} className="border-0">
+                      <AccordionTrigger className="py-2 text-xs hover:no-underline">
+                        <span className="font-mono">{part.toolName}</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2 overflow-x-auto pb-3">
+                        <JsonBlock label="args" value={part.args} />
+                        {part.status === "done" && part.result !== undefined ? (
+                          <JsonBlock label="result" value={part.result} />
+                        ) : null}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 ),
               )}
               {chatMessage.status === "streaming" ? (
