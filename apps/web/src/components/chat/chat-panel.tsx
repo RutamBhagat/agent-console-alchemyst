@@ -109,7 +109,6 @@ export function ChatPanel({ onSubmitMessage }: ChatPanelProps) {
           name="message"
           placeholder="Type a message..."
           value={message}
-          disabled={isStreaming}
           onChange={(event) => setMessage(event.target.value)}
         />
         <Button type="submit" disabled={isStreaming}>
