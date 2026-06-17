@@ -49,8 +49,7 @@ export function createReconnectController(options: ReconnectControllerOptions) {
 
   function send(message: JsonEvent) {
     if (socket?.readyState === OPEN) {
-      sendOpenSocket(message);
-      return;
+      if (sendOpenSocket(message)) return;
     }
 
     pending.push(message);
@@ -112,15 +111,28 @@ export function createReconnectController(options: ReconnectControllerOptions) {
   function flush() {
     while (pending.length > 0 && socket?.readyState === OPEN) {
       const next = pending.shift();
-      if (next) sendOpenSocket(next);
+      if (!next) continue;
+      if (sendOpenSocket(next)) continue;
+
+      pending.unshift(next);
+      break;
     }
   }
 
   function sendOpenSocket(message: JsonEvent) {
-    socket?.send(JSON.stringify(message));
+    const activeSocket = socket;
+    if (!activeSocket || activeSocket.readyState !== OPEN) return false;
+
+    try {
+      activeSocket.send(JSON.stringify(message));
+    } catch {
+      activeSocket.close();
+      return false;
+    }
+
     options.onSend(message);
+    return true;
   }
 
   return { connect, send, forceReconnect };
 }
-
