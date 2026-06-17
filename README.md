@@ -7,9 +7,11 @@ The protocol handling is intentionally kept in a Web Worker: incoming frames are
 > [!NOTE]
 > `apps/agent-server` is the provided backend. It is read for protocol behavior, but not edited.
 
-## Youtube Demo
+## Youtube Demo 
 
-https://youtu.be/dA4lSnbTh2s
+https://youtu.be/8bsGGsMPEAo
+
+- Note: Timestamps are in the description due to pending advanced feature verification from youtube
 
 ## Screenshots
 
