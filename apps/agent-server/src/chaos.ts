@@ -1,21 +1,3 @@
-import { ChaosConfig, ServerMessage } from "./types/index.js";
-
-type IntRange = [number, number];
-
-const CHAOS_SETTINGS = {
-  dropConnection: { enabled: true, afterMessages: [15, 15] },
-  reorder: { enabled: false, chancePercent: [15, 35] },
-  duplicate: { enabled: false, chancePercent: [5, 15] },
-  latencySpike: { enabled: false, chancePercent: [5, 13], ms: [2000, 8000] },
-  corruptPing: { enabled: false, chancePercent: [15, 25] }, // PASS
-} satisfies {
-  dropConnection: { enabled: boolean; afterMessages: IntRange };
-  reorder: { enabled: boolean; chancePercent: IntRange };
-  duplicate: { enabled: boolean; chancePercent: IntRange };
-  latencySpike: { enabled: boolean; chancePercent: IntRange; ms: IntRange };
-  corruptPing: { enabled: boolean; chancePercent: IntRange };
-};
-
 // ─────────────────────────────────────────────────────────────
 // ChaosEngine
 //
@@ -26,6 +8,8 @@ const CHAOS_SETTINGS = {
 // - Connection drops (signalled, not executed here)
 // - Corrupt heartbeats
 // ─────────────────────────────────────────────────────────────
+
+import { ChaosConfig, ServerMessage } from "./types/index.js";
 
 export class ChaosEngine {
   private config: ChaosConfig;
@@ -56,7 +40,7 @@ export class ChaosEngine {
    * Check if a PING should have its challenge corrupted.
    */
   shouldCorruptPing(): boolean {
-    return this.hitsChance(this.config.corruptPingChancePercent);
+    return Math.random() < this.config.corruptPingProbability;
   }
 
   /**
@@ -76,13 +60,13 @@ export class ChaosEngine {
     let delayMs = 0;
 
     // ── Latency spike ─────────────────────────────────────
-    if (this.hitsChance(this.config.latencySpikeChancePercent)) {
+    if (Math.random() < this.config.latencySpikeProbability) {
       const [min, max] = this.config.latencySpikeMs;
       delayMs = min + Math.random() * (max - min);
     }
 
     // ── Reorder: buffer messages and shuffle ──────────────
-    if (this.hitsChance(this.config.reorderChancePercent)) {
+    if (Math.random() < this.config.reorderProbability) {
       this.reorderBuffer.push(message);
       if (this.reorderBuffer.length >= this.REORDER_BUFFER_SIZE) {
         // Fisher-Yates shuffle
@@ -115,7 +99,7 @@ export class ChaosEngine {
     const finalOutput: ServerMessage[] = [];
     for (const msg of output) {
       finalOutput.push(msg);
-      if (this.hitsChance(this.config.duplicateChancePercent)) {
+      if (Math.random() < this.config.duplicateProbability) {
         finalOutput.push(msg); // exact duplicate, same seq
       }
     }
@@ -137,40 +121,28 @@ export class ChaosEngine {
     this.reorderBuffer = [];
     return buf;
   }
-
-  private hitsChance(percent: number): boolean {
-    return Math.random() * 100 < percent;
-  }
 }
 
 /**
- * Generate a chaos config from the settings above.
- * Set enabled=false to isolate one behavior while testing.
+ * Generate a chaos config with random parameters.
+ * Each connection gets a different chaos profile so candidates
+ * can't hard-code around a specific pattern.
  */
 export function generateChaosConfig(): ChaosConfig {
   return {
-    dropAfterMessages: CHAOS_SETTINGS.dropConnection.enabled
-      ? randomIntRange(CHAOS_SETTINGS.dropConnection.afterMessages)
-      : null,
-    reorderChancePercent: CHAOS_SETTINGS.reorder.enabled
-      ? randomIntRange(CHAOS_SETTINGS.reorder.chancePercent)
-      : 0,
-    duplicateChancePercent: CHAOS_SETTINGS.duplicate.enabled
-      ? randomIntRange(CHAOS_SETTINGS.duplicate.chancePercent)
-      : 0,
-    latencySpikeChancePercent: CHAOS_SETTINGS.latencySpike.enabled
-      ? randomIntRange(CHAOS_SETTINGS.latencySpike.chancePercent)
-      : 0,
-    latencySpikeMs: [
-      CHAOS_SETTINGS.latencySpike.ms[0],
-      CHAOS_SETTINGS.latencySpike.ms[1],
-    ],
-    corruptPingChancePercent: CHAOS_SETTINGS.corruptPing.enabled
-      ? randomIntRange(CHAOS_SETTINGS.corruptPing.chancePercent)
-      : 0,
+    // On about half of chaos connections, drop after 15-44 sent messages.
+    dropAfterMessages:
+      Math.random() < 0.5 ? 15 + Math.floor(Math.random() * 30) : null,
+    // dropAfterMessages: null,
+    // reorderProbability: 0.15 + Math.random() * 0.2, // 15-35%
+    reorderProbability: 0,
+    // duplicateProbability: 0.05 + Math.random() * 0.1, // 5-15%
+    duplicateProbability: 0,
+    // latencySpikeProbability: 0.05 + Math.random() * 0.08, // 5-13%
+    latencySpikeProbability: 0,
+    // latencySpikeMs: [2000, 6000 + Math.random() * 2000],
+    latencySpikeMs: [2000, 8000],
+    // corruptPingProbability: 0.15 + Math.random() * 0.1, // 15-25%
+    corruptPingProbability: 0,
   };
-}
-
-function randomIntRange([min, max]: IntRange): number {
-  return min + Math.floor(Math.random() * (max - min + 1));
 }

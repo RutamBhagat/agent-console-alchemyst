@@ -30,7 +30,12 @@ type WorkerPatch = {
   context?: ContextSnapshotMessage;
 };
 
-type WorkerEvent = WorkerPatch | TraceEvent;
+type RetryUserMessage = {
+  type: "retryUserMessage";
+  content: string;
+};
+
+type WorkerEvent = WorkerPatch | TraceEvent | RetryUserMessage;
 
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
@@ -42,6 +47,7 @@ export default function Home() {
     addToolCall,
     addToolResult,
     endStream,
+    retryUserMessage,
     chats,
   } = useChatStore();
   const addContextSnapshot = useContextStore(
@@ -61,6 +67,10 @@ export default function Home() {
     worker.addEventListener("message", (event: MessageEvent<WorkerEvent>) => {
       if (event.data.type === "clientEvent") {
         addTraceEvent(event.data);
+        return;
+      }
+      if (event.data.type === "retryUserMessage") {
+        retryUserMessage({ type: "USER_MESSAGE", content: event.data.content });
         return;
       }
 
@@ -94,6 +104,7 @@ export default function Home() {
     addTraceEvent,
     clearTraceEvents,
     endStream,
+    retryUserMessage,
   ]);
 
   useEffect(() => {

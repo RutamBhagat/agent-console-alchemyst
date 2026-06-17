@@ -25,6 +25,7 @@ interface ChatState {
   addToolCall: (call: ToolCallMessage) => void;
   addToolResult: (result: ToolResultMessage) => void;
   endStream: (end: StreamEndMessage) => void;
+  retryUserMessage: (message: UserMessagePayload) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -89,6 +90,12 @@ export const useChatStore = create<ChatState>((set) => ({
         chats: upsertStream(state.chats, streams[end.stream_id]),
       };
     }),
+  retryUserMessage: (message) =>
+    set((state) => {
+      const index = state.chats.findLastIndex((chat) => !("stream_id" in chat));
+      const chats = index === -1 ? state.chats : state.chats.slice(0, index);
+      return { chats: [...chats, message], streams: streamsFromChats(chats) };
+    }),
 }));
 
 function emptyStream(stream_id: string): ChatStream {
@@ -101,4 +108,12 @@ function upsertStream(chats: ChatEntry[], stream: ChatStream): ChatEntry[] {
   );
   if (index === -1) return [...chats, stream];
   return chats.map((chat, itemIndex) => (itemIndex === index ? stream : chat));
+}
+
+function streamsFromChats(chats: ChatEntry[]): Record<string, ChatStream> {
+  return Object.fromEntries(
+    chats
+      .filter((chat): chat is ChatStream => "stream_id" in chat)
+      .map((stream) => [stream.stream_id, stream]),
+  );
 }

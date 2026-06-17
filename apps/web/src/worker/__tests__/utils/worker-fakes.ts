@@ -24,14 +24,14 @@ export class FakeWebSocket {
   static latest?: FakeWebSocket;
   readyState = FakeWebSocket.OPEN;
   sent: string[] = [];
-  private listener?: Listener;
+  private listeners: Partial<Record<"open" | "close" | "message", Listener>> = {};
 
   constructor(readonly url: string) {
     FakeWebSocket.latest = this;
   }
 
-  addEventListener(_type: "message", listener: Listener) {
-    this.listener = listener;
+  addEventListener(type: "open" | "close" | "message", listener: Listener) {
+    this.listeners[type] = listener;
   }
 
   send(data: string) {
@@ -40,8 +40,17 @@ export class FakeWebSocket {
 
   close() {}
 
+  open() {
+    this.listeners.open?.({} as MessageEvent);
+  }
+
+  serverClose() {
+    this.readyState = 3;
+    this.listeners.close?.({} as MessageEvent);
+  }
+
   serverMessage(data: string) {
-    this.listener?.({ data } as MessageEvent);
+    this.listeners.message?.({ data } as MessageEvent);
   }
 }
 

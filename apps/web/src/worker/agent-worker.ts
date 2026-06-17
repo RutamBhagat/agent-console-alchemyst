@@ -1,12 +1,14 @@
 import { prettifyError, ZodError } from "zod";
 
 import { ServerMessageSchema, WorkerMessageSchema } from "./schemas/protocol";
+import { createReconnectController } from "./reconnect-controller";
 import { createSequenceGate } from "./sequence-gate";
 import type { ClientMessage } from "./types/clientToServer";
 import type { ServerMessage } from "./types/serverToClient";
 
 export let socket: WebSocket | undefined;
 const sequenceGate = createSequenceGate();
+const reconnect = createReconnectController();
 let lastPongedPingSeq = 0;
 
 self.addEventListener("message", (event: MessageEvent<unknown>) => {
@@ -17,17 +19,14 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
       connect(message.url);
       return;
     case "disconnect":
-      socket?.close();
-      socket = undefined;
+      {
+        const currentSocket = socket;
+        socket = undefined;
+        currentSocket?.close();
+      }
       return;
     case "sendUserMessage": {
-      const userMessage = { type: "USER_MESSAGE", content: message.content } satisfies ClientMessage;
-      if (socket?.readyState === WebSocket.OPEN) {
-        sequenceGate.reset();
-        lastPongedPingSeq = 0;
-        socket.send(JSON.stringify(userMessage));
-        self.postMessage({ type: "clientEvent", direction: "out", message: userMessage });
-      }
+      sendUserMessage(message.content);
       return;
     }
     case "toolAck": {
@@ -42,9 +41,39 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
 });
 
 function connect(url: string) {
-  socket?.close();
-  socket = new WebSocket(url);
-  socket.addEventListener("message", handleSocketMessage);
+  reconnect.connect(url);
+  const oldSocket = socket;
+  socket = undefined;
+  oldSocket?.close();
+  const nextSocket = new WebSocket(url);
+  socket = nextSocket;
+  nextSocket.addEventListener("open", handleSocketOpen);
+  nextSocket.addEventListener("close", () => handleSocketClose(nextSocket));
+  nextSocket.addEventListener("message", handleSocketMessage);
+}
+
+function handleSocketOpen() {
+  const content = reconnect.takeReconnectMessage();
+  if (!content) return;
+  sendUserMessage(content);
+}
+
+function handleSocketClose(closedSocket: WebSocket | undefined) {
+  if (closedSocket !== socket) return;
+  const content = reconnect.socketClosed();
+  if (!content) return;
+  self.postMessage({ type: "retryUserMessage", content });
+  connect(reconnect.url);
+}
+
+function sendUserMessage(content: string) {
+  const userMessage = { type: "USER_MESSAGE", content } satisfies ClientMessage;
+  if (socket?.readyState !== WebSocket.OPEN) return;
+  reconnect.sentUserMessage(content);
+  sequenceGate.reset();
+  lastPongedPingSeq = 0;
+  socket.send(JSON.stringify(userMessage));
+  self.postMessage({ type: "clientEvent", direction: "out", message: userMessage });
 }
 
 function handleSocketMessage(event: MessageEvent) {
@@ -86,7 +115,10 @@ function applyServerMessage(message: ServerMessage) {
   switch (message.type) {
     case "TOKEN":
     case "TOOL_RESULT":
+      self.postMessage({ type: "statePatch", chat: message });
+      return;
     case "STREAM_END": {
+      reconnect.streamEnded();
       self.postMessage({ type: "statePatch", chat: message });
       return;
     }

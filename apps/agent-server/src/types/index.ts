@@ -51,11 +51,11 @@ export interface ClientLogEntry {
 
 export interface ChaosConfig {
   dropAfterMessages: number | null;
-  reorderChancePercent: number;
-  duplicateChancePercent: number;
-  latencySpikeChancePercent: number;
+  reorderProbability: number;
+  duplicateProbability: number;
+  latencySpikeProbability: number;
   latencySpikeMs: [number, number]; // [min, max]
-  corruptPingChancePercent: number;
+  corruptPingProbability: number;
 }
 
 // ── Server Mode ───────────────────────────────────────────────
