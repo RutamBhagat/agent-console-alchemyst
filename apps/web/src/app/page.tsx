@@ -22,7 +22,7 @@ import { useUtilStore } from "@/stores/util-store";
 import type {
   ContextSnapshotMessage,
   ServerMessage,
-} from "@/worker/types/serverToClient";
+} from "../../../agent-server/src/types";
 
 type WorkerPatch = {
   type: "statePatch";

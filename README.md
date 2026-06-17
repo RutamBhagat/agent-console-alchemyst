@@ -1,106 +1,163 @@
 # Agent Console Alchemyst
 
-A Next.js agent console for the Alchemyst full-stack assignment. The frontend treats the WebSocket stream as a distributed-systems problem: ordering, heartbeats, reconnect/resume, trace inspection, and large context diffs are handled explicitly instead of hidden inside a chat component.
+A Next.js Agent Console for the Alchemyst full-stack assignment. The frontend connects to the provided WebSocket agent server, streams assistant tokens, renders tool calls/results, tracks protocol events in a virtualized trace panel, and inspects context snapshots with diff history.
 
-The protocol loop runs in a Web Worker, emits only ordered/deduped events into React, and advances `RESUME.last_seq` only after React confirms the UI consumed a `seq`.
+The protocol handling is intentionally kept in a Web Worker: incoming frames are validated with Zod, reordered/deduplicated by sequence number, and then applied to small Zustand stores for chat, trace, and context UI. See [DECISIONS.md](./DECISIONS.md) for the important reconnect tradeoff: this mock backend aborts generation on reconnect, so the client replays the active user turn to recover a complete answer instead of pretending `RESUME` can continue an aborted script.
 
-> [!IMPORTANT]
-> `apps/agent-server` was treated as read-only. In chaos mode it can abort the active script after a drop, so `RESUME` can replay already-generated history but cannot create missing future tokens; the client resends the last user message when resume makes no stream progress.
+> [!NOTE]
+> `apps/agent-server` is the provided backend. It is read for protocol behavior, but not edited.
+
+## Features
+
+- Incremental token rendering over WebSockets.
+- Tool call cards keyed by `call_id`, with `TOOL_ACK` sent from the UI path.
+- Worker-side sequence gate for out-of-order and duplicate server messages.
+- Immediate `PONG` responses, including corrupt empty heartbeat challenges.
+- Virtualized trace sidebar with token grouping, search, and event type filters.
+- Context inspector with JSON tree rendering, diff view, and snapshot navigation.
+- Chaos-mode reconnect fallback that rewinds the active chat turn and resends the last user message.
 
 ## Architecture
+
 ```mermaid
 flowchart LR
-  Server[agent-server ws://localhost:4747/ws]
-  Worker[Web Worker protocol loop]
-  Gate[SequenceGate buffer + dedupe]
-  Watchdog[Stream stall watchdog]
-  Stores[Zustand stores]
-  UI[Chat + Trace + Context UI]
-  Server <--> Worker
-  Worker --> Gate
-  Gate -->|next ordered event| Stores
-  Stores --> UI
-  UI -->|processed seq| Worker
-  Worker -->|PONG TOOL_ACK RESUME USER_MESSAGE| Server
-  Watchdog -->|force reconnect or resend last turn| Worker
+  Server[agent-server WebSocket] <--> Worker[agent-worker]
+  Worker --> Gate[sequence gate]
+  Gate --> Chat[chat store]
+  Gate --> Trace[trace store]
+  Gate --> Context[context store]
+  Chat --> UI[chat panel]
+  Trace --> Timeline[trace sidebar]
+  Context --> Inspector[context inspector]
 ```
+
+The worker is the protocol boundary. It parses unknown frames, sends heartbeat replies, buffers out-of-order messages until they are contiguous, drops duplicates, and emits state patches. React stays focused on rendering and interaction.
 
 ## Connection State Machine
+
 ```mermaid
 stateDiagram-v2
-  [*] --> connecting
-  connecting --> connected: socket open
-  connected --> streaming: USER_MESSAGE sent
-  streaming --> tool_call_pending: TOOL_CALL rendered + TOOL_ACK sent
-  tool_call_pending --> streaming: TOOL_RESULT processed
-  streaming --> connected: STREAM_END
-  connected --> reconnecting: close/error
-  streaming --> reconnecting: close/error/stall
-  tool_call_pending --> reconnecting: close/error/stall
-  reconnecting --> resuming: socket reopened
-  resuming --> streaming: RESUME replay advances stream
-  resuming --> streaming: no progress, resend last user message
-  resuming --> connected: replay complete
+  [*] --> disconnected
+  disconnected --> connecting: connect(url)
+  connecting --> idle: socket open
+  idle --> streaming: USER_MESSAGE
+  streaming --> tool_call_pending: TOOL_CALL
+  tool_call_pending --> streaming: TOOL_ACK + TOOL_RESULT
+  streaming --> idle: STREAM_END
+  streaming --> reconnecting: socket close
+  tool_call_pending --> reconnecting: socket close
+  reconnecting --> replaying_turn: new socket open
+  replaying_turn --> streaming: resend last USER_MESSAGE
+  streaming --> live_gap_resume: PING reveals seq gap
+  live_gap_resume --> streaming: RESUME(lastAppliedSeq)
+  idle --> disconnected: disconnect
 ```
 
-## Run Locally
-Prerequisites: Docker, Bun `1.3.4+`, Node.js `20+`.
+## Prerequisites
 
-Start the mock server:
+- Bun 1.3+
+- Docker, for the provided backend container
+- Node.js 20+, if you inspect or run the backend outside Docker
+
+## Run Locally
+
+Install dependencies:
+
 ```bash
-cd apps/agent-server
-docker build -t agent-server .
+bun install
+```
+
+Build and run the provided agent server in normal mode:
+
+```bash
+docker build -t agent-server ./apps/agent-server
 docker run -p 4747:4747 agent-server
 ```
 
-Run chaos mode:
+In another terminal, start the web app:
+
 ```bash
-cd apps/agent-server
+bun run dev:web
+```
+
+Open:
+
+```text
+http://localhost:3001
+```
+
+The frontend defaults to:
+
+```text
+ws://localhost:4747/ws
+```
+
+To point it at a different backend, set `NEXT_PUBLIC_AGENT_WS_URL`.
+
+## Chaos Mode
+
+Run the backend with chaos enabled:
+
+```bash
 docker run -p 4747:4747 agent-server --mode chaos
 ```
 
-Start the web app from the repo root:
+Useful prompt keywords from the backend:
+
+| Prompt keyword | Scenario |
+| --- | --- |
+| `hello` | Basic token stream |
+| `report`, `summary`, `q3` | Tool call plus context updates |
+| `analyze`, `compare` | Sequential tool calls |
+| `lookup`, `find`, `search` | Tool call before tokens |
+| `schema`, `database`, `large` | Oversized context snapshot |
+| `long`, `detailed`, `document` | Long response stream |
+
+Check backend protocol logs:
+
 ```bash
-bun install
-bun run dev:web
+curl -s http://localhost:4747/log
 ```
-Open `http://localhost:3001`.
 
-Build and start production:
+Reset backend state:
+
 ```bash
-bun install
-npm run build
-npm run start
+curl -s http://localhost:4747/reset
 ```
 
-Check protocol logs:
-```bash
-curl -s http://localhost:4747/log | python3 -m json.tool
+## Screenshots
+
+Add the normal-mode screenshots required by the assignment before submission:
+
+| View | File |
+| --- | --- |
+| Streamed response with a tool call | `docs/screenshots/chat-tool-call.png` |
+| Trace timeline | `docs/screenshots/trace-timeline.png` |
+| Context inspector diff | `docs/screenshots/context-diff.png` |
+
+## Project Layout
+
+```text
+apps/
+  agent-server/   Provided WebSocket backend
+  web/            Next.js Agent Console
+packages/
+  env/            Typed environment config
+  ui/             Shared UI components
+assignment/       Original assignment docs and failure-mode notes
 ```
-## Submission Media
-Normal-mode screenshots:
-### Streamed response with tool call
-<img width="2560" height="1440" alt="Screenshot_20260618_000918" src="https://github.com/user-attachments/assets/9aa1a323-5ed8-494a-9705-d876804792a6" />
 
-### Trace timeline
-<img width="764" height="1440" alt="Screenshot_20260618_001009" src="https://github.com/user-attachments/assets/bf941b46-1e16-4f07-bb0d-06fefece62b5" />
+## Scripts
 
-### Context inspector diff
-<img width="1796" height="1440" alt="Screenshot_20260618_001044" src="https://github.com/user-attachments/assets/44a3d88e-c934-433a-9739-d12d0c657448" />
-<img width="1797" height="1440" alt="Screenshot_20260618_001025" src="https://github.com/user-attachments/assets/20570f53-1b72-4295-8e87-1597983d2b06" />
+| Command | Description |
+| --- | --- |
+| `bun run dev:web` | Start the Next.js app on port 3001 |
+| `bun run build` | Build workspace packages/apps |
+| `bun run start` | Start the built web app |
+| `bun run test` | Run the web app Vitest suite |
 
-Chaos-mode recording:
-Demo YouTube: https://youtu.be/dA4lSnbTh2s
+## Submission Notes
 
-The recording should label connection drop, out-of-order handling, sequential tool calls, oversized context, and corrupt heartbeat behavior. True continuation after an aborted chaos stream is limited by the fixed mock server; see [DECISIONS.md](DECISIONS.md).
-
-## Implementation Notes
-- `apps/web/src/worker/agent-worker.ts` owns socket lifecycle, heartbeats, tool ACKs, resume, and resend recovery.
-- `apps/web/src/worker/sequence-gate.ts` owns ordered delivery and deduplication.
-- `apps/web/src/worker/stream-stall-watchdog.ts` detects streams that reconnect but stop producing ordered progress.
-- `apps/web/src/store/chat-store.ts` keeps text and tool cards as ordered parts so tool calls do not overwrite streamed text.
-- `apps/web/src/store/trace-store.ts` groups token frames into expandable rows.
-- `apps/web/src/components/context/context-panel.tsx` uses `@uiw/react-json-view` for normal JSON and `virtual-react-json-diff` for large diffs, because the non-virtual diff path blocked the main thread on very large second comparisons.
-
-## Design Decisions
-Detailed tradeoffs are in [DECISIONS.md](DECISIONS.md), including why `RESUME` is insufficient for this mock server after an aborted chaos stream and why the last user message is resent as a practical workaround.
+- `DECISIONS.md` documents the protocol tradeoffs and known backend failure modes.
+- The chaos-mode screen recording is still a required external submission asset.
+- The backend `/log` endpoint is the source of truth for `PONG`, `TOOL_ACK`, `RESUME`, and protocol violation records.

@@ -1,4 +1,4 @@
-import type { UserMessagePayload } from "@/worker/types/clientToServer";
+import type { UserMessagePayload } from "../../../../agent-server/src/types";
 
 export function UserMessage({ message }: { message: UserMessagePayload }) {
   return (
