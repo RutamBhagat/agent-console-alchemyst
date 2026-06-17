@@ -7,7 +7,7 @@
 - Chaos drops often aborted the active script, which meant `RESUME` could replay only already-generated events and could not create missing future tokens.
 - Because true resume was technically useless after an aborted script, the client pivots to resending the last user message when a resume makes no stream progress.
 - New prompts are queued/blocked during streaming because the mock server is single-session and clears or restarts history on a new `USER_MESSAGE`.
-- `TOOL_ACK` is sent immediately when a raw `TOOL_CALL` frame is seen, because waiting for ordered UI processing could miss the server's ACK timeout during chaos reordering.
+- A correct frontend-only fix for `TOOL_ACK` violations is impossible with the provided backend. First, chaos mode can buffer a `TOOL_CALL` before it is delivered while the server still starts the 5s ACK timer, so a client can ACK immediately after seeing the call and still be late from the server's point of view. Second, reconnect aborts the active script and clears `pendingAcks`, but `RESUME` can replay the old `TOOL_CALL`; ACKing that historical call is then logged as `unexpected` because no active server wait exists. The client can only reduce symptoms by avoiding replayed/dead ACKs and sending live ACKs as early as the assignment constraints allow; full correctness requires backend changes.
 
 ## Sequence ordering and deduplication
 
