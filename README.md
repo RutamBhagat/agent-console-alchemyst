@@ -79,9 +79,15 @@ curl -s http://localhost:4747/log | python3 -m json.tool
 ```
 ## Submission Media
 Normal-mode screenshots:
-![Streamed response with tool call](docs/screenshots/stream-tool-call.png)
-![Trace timeline](docs/screenshots/trace-timeline.png)
-![Context inspector diff](docs/screenshots/context-diff.png)
+### Streamed response with tool call
+<img width="815" height="1239" alt="Screenshot_20260617_225326" src="https://github.com/user-attachments/assets/d4ceaf67-1d6d-4c45-b7a2-78d3c8fcfcd0" />
+
+### Trace timeline
+<img width="846" height="1167" alt="Screenshot_20260617_225406" src="https://github.com/user-attachments/assets/ba98beb0-d61f-47d8-bad5-a0cb7af06f2c" />
+
+### Context inspector diff
+<img width="808" height="1319" alt="Screenshot_20260617_225457" src="https://github.com/user-attachments/assets/3b42cb89-3ff9-4782-99a6-bf735f2e4fc1" />
+<img width="793" height="1302" alt="Screenshot_20260617_225509" src="https://github.com/user-attachments/assets/b17c8ed7-cd7d-4041-97c0-e4c34595f360" />
 
 Chaos-mode recording:
 YouTube/Loom: `TODO: paste unlisted recording link here`
