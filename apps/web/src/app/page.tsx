@@ -10,6 +10,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@agent-console-alchemyst/ui/components/sidebar";
+import { UserMessage } from "@/components/chat/user-message";
 import { ToolTurn } from "@/components/tools/tool-turn";
 import { useChatStore } from "@/stores/chat-store";
 import type { ServerMessage } from "@/worker/types/serverToClient";
@@ -19,7 +20,7 @@ type WorkerPatch = { type: "statePatch"; chat?: ServerMessage };
 export default function Home() {
   const workerRef = useRef<Worker>(undefined);
   const [message, setMessage] = useState("");
-  const { addToken, addToolCall, addToolResult, endStream, chats } =
+  const { addUserMessage, addToken, addToolCall, addToolResult, endStream, chats } =
     useChatStore();
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function Home() {
     const content = message.trim();
     if (!content) return;
 
+    addUserMessage({ type: "USER_MESSAGE", content });
     workerRef.current?.postMessage({ type: "sendUserMessage", content });
     setMessage("");
   }
@@ -64,17 +66,21 @@ export default function Home() {
       <Sidebar side="left" collapsible="offcanvas"></Sidebar>
       <SidebarInset className="relative h-svh min-h-0 p-4">
         <main className="mx-auto flex h-full w-[min(760px,100%)] flex-col gap-4 overflow-y-auto pb-24 pt-8">
-          {chats.map((chat) => (
-            <article
-              key={chat.stream_id}
-              className="rounded-lg border bg-background p-4 shadow-sm"
-            >
-              <p className="whitespace-pre-wrap text-sm leading-6">
-                {chat.text || " "}
-              </p>
-              <ToolTurn chat={chat} />
-            </article>
-          ))}
+          {chats.map((chat, index) =>
+            "type" in chat ? (
+              <UserMessage key={`user-${index}`} message={chat} />
+            ) : (
+              <article
+                key={chat.stream_id}
+                className="rounded-lg border bg-background p-4 shadow-sm"
+              >
+                <p className="whitespace-pre-wrap text-sm leading-6">
+                  {chat.text || " "}
+                </p>
+                <ToolTurn chat={chat} />
+              </article>
+            ),
+          )}
         </main>
         <form
           onSubmit={submitMessage}
