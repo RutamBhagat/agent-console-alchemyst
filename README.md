@@ -90,7 +90,7 @@ Normal-mode screenshots:
 <img width="793" height="1302" alt="Screenshot_20260617_225509" src="https://github.com/user-attachments/assets/b17c8ed7-cd7d-4041-97c0-e4c34595f360" />
 
 Chaos-mode recording:
-YouTube/Loom: https://youtu.be/dA4lSnbTh2s
+Demo YouTube: https://youtu.be/dA4lSnbTh2s
 
 The recording should label connection drop, out-of-order handling, sequential tool calls, oversized context, and corrupt heartbeat behavior. True continuation after an aborted chaos stream is limited by the fixed mock server; see [DECISIONS.md](DECISIONS.md).
 
