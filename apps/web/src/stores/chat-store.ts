@@ -15,7 +15,7 @@ export interface ChatStream {
   ended: boolean;
 }
 
-export type ChatEntry = ChatStream | UserMessagePayload;
+type ChatEntry = ChatStream | UserMessagePayload;
 
 interface ChatState {
   streams: Record<string, ChatStream>;

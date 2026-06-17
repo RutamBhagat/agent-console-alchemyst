@@ -44,8 +44,14 @@ export default function Home() {
     endStream,
     chats,
   } = useChatStore();
-  const addContextSnapshot = useContextStore((state) => state.addContextSnapshot);
-  const { events: traceEvents, addTraceEvent, clearTraceEvents } = useTraceStore();
+  const addContextSnapshot = useContextStore(
+    (state) => state.addContextSnapshot,
+  );
+  const {
+    events: traceEvents,
+    addTraceEvent,
+    clearTraceEvents,
+  } = useTraceStore();
   const { fullscreen, mode, toggleMode } = useUtilStore();
 
   useEffect(() => {
@@ -110,7 +116,11 @@ export default function Home() {
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": fullscreen ? "100rem" : "40rem" } as CSSProperties}>
+    <SidebarProvider
+      style={
+        { "--sidebar-width": fullscreen ? "100rem" : "30rem" } as CSSProperties
+      }
+    >
       <SidebarTrigger className="fixed left-3 top-3 z-50 bg-background/90 shadow-sm backdrop-blur" />
       <Sidebar side="left" collapsible="offcanvas">
         <TraceSidebar events={traceEvents} />
